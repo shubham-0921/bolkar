@@ -95,12 +95,6 @@ export default function AppPage() {
     }
   };
 
-  const handleReRecord = () => {
-    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-    setEditText(null);
-    reset();
-  };
-
   const handleDismiss = () => {
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
     setEditText(null);
@@ -117,9 +111,9 @@ export default function AppPage() {
   }, [editText, result]);
 
   const launchPip = useCallback(async () => {
-    if (pipActive && pipWindowRef.current && !pipWindowRef.current.closed) {
-      pipWindowRef.current.focus();
-      return;
+    // Close any existing PiP window before opening a new one
+    if (pipWindowRef.current && !pipWindowRef.current.closed) {
+      pipWindowRef.current.close();
     }
 
     type DPip = { requestWindow(o: { width: number; height: number }): Promise<Window> };
@@ -150,7 +144,7 @@ export default function AppPage() {
     } catch (err) {
       console.error("PiP failed:", err);
     }
-  }, [mode, pipActive]);
+  }, [mode]);
 
   const pinToNotifications = useCallback(async () => {
     if (!("Notification" in window) || !("serviceWorker" in navigator)) return;
@@ -204,7 +198,7 @@ export default function AppPage() {
               style={{
                 backgroundColor: historyItems.length > 0 ? "rgba(255,255,255,0.06)" : "transparent",
                 border: `1px solid ${historyItems.length > 0 ? "rgba(255,255,255,0.1)" : "transparent"}`,
-                color: historyItems.length > 0 ? "#71717a" : "#3f3f46",
+                color: historyItems.length > 0 ? "#a1a1aa" : "#71717a",
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -218,50 +212,16 @@ export default function AppPage() {
                 </span>
               )}
             </button>
-            {notifSupported && (
-              <button
-                onClick={pinToNotifications}
-                title={pinned ? "Remove from notifications" : "Pin to notification bar"}
-                className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all"
-                style={{
-                  backgroundColor: pinned ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.06)",
-                  border: `1px solid ${pinned ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)"}`,
-                  color: pinned ? "#d4d4d8" : "#71717a",
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-                  {pinned && <line x1="2" y1="2" x2="22" y2="22" />}
-                </svg>
-                {pinned ? "Unpin" : "Pin"}
-              </button>
-            )}
-            {pipSupported && (
-              <button
-                onClick={launchPip}
-                title={pipActive ? "Click to bring floating bubble to front" : "Open as floating bubble"}
-                className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all"
-                style={{
-                  backgroundColor: pipActive ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.06)",
-                  border: `1px solid ${pipActive ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.1)"}`,
-                  color: pipActive ? "#d4d4d8" : "#71717a",
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="14" x="3" y="3" rx="2" />
-                  <rect width="7" height="5" x="12" y="12" rx="1" fill="currentColor" stroke="none" />
-                </svg>
-                {pipActive ? "Bring to front" : "Float"}
-              </button>
-            )}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-zinc-600">powered by</span>
+            <div
+              className="flex items-center gap-2 rounded-full px-3.5 py-2"
+              style={{ backgroundColor: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)" }}
+            >
+              <span className="text-xs font-semibold" style={{ color: "#a1a1aa" }}>Made with</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://assets.sarvam.ai/assets/svgs/sarvam-logo-white.svg"
                 alt="Sarvam AI"
-                style={{ height: 16, opacity: 0.55 }}
+                style={{ height: 17, opacity: 0.95 }}
               />
             </div>
           </div>
@@ -284,7 +244,7 @@ export default function AppPage() {
                 className="flex flex-col items-center gap-1 rounded-xl px-8 py-4 transition-all duration-200 disabled:opacity-40"
                 style={{
                   backgroundColor: mode === "translate" ? cfg.activePillBg : "transparent",
-                  color: mode === "translate" ? "#ffffff" : "#71717a",
+                  color: mode === "translate" ? "#ffffff" : "#a1a1aa",
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -311,7 +271,7 @@ export default function AppPage() {
                 className="flex flex-col items-center gap-1 rounded-xl px-8 py-4 transition-all duration-200 disabled:opacity-40"
                 style={{
                   backgroundColor: mode === "transcribe" ? cfg.activePillBg : "transparent",
-                  color: mode === "transcribe" ? "#ffffff" : "#71717a",
+                  color: mode === "transcribe" ? "#ffffff" : "#a1a1aa",
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -340,11 +300,11 @@ export default function AppPage() {
           <div
             key={mode}
             className="mb-10 animate-fade-in-up overflow-hidden rounded-2xl"
-            style={{ backgroundColor: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}
+            style={{ backgroundColor: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}
           >
             <div className="grid grid-cols-2">
-              <div className="p-4" style={{ borderRight: "1px solid rgba(255,255,255,0.08)" }}>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.35)" }}>You say</p>
+              <div className="p-4" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#71717a" }}>You say</p>
                 <p className="text-sm italic text-zinc-300 leading-relaxed">
                   {mode === "translate"
                     ? '"yaar report bhejo EOD tak"'
@@ -352,7 +312,7 @@ export default function AppPage() {
                 </p>
                 <span
                   className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                  style={{ backgroundColor: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.4)" }}
+                  style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#a1a1aa" }}
                 >
                   {mode === "translate" ? "Hinglish" : "Hindi"}
                 </span>
@@ -403,7 +363,7 @@ export default function AppPage() {
                 }}
               >
                 {isProcessing ? (
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#71717a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                   </svg>
                 ) : isRecording ? (
@@ -429,7 +389,7 @@ export default function AppPage() {
               </div>
             )}
 
-            <p className="text-base font-medium text-zinc-500">
+            <p className="text-base font-medium text-zinc-400">
               {isRecording
                 ? "Recording — click to stop"
                 : isProcessing
@@ -439,6 +399,85 @@ export default function AppPage() {
                 : "Click the mic to start"}
             </p>
           </div>
+
+          {/* Use Bolkar Anywhere — shown when idle and at least one option is supported */}
+          {!isRecording && !isProcessing && !showResult && !showError && (pipSupported || notifSupported) && (
+            <div
+              className="mt-10 animate-fade-in-up overflow-hidden rounded-2xl"
+              style={{ backgroundColor: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}
+            >
+              <div className="px-5 pt-5 pb-3">
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#71717a" }}>Use Bolkar anywhere</p>
+                <p className="mt-1 text-sm" style={{ color: "#a1a1aa" }}>Keep Bolkar accessible while you work in other apps</p>
+              </div>
+              <div className={`grid gap-3 px-5 pb-5 ${pipSupported && notifSupported ? "grid-cols-2" : "grid-cols-1"}`}>
+                {pipSupported && (
+                  <button
+                    onClick={launchPip}
+                    className="group flex flex-col items-start gap-3 rounded-xl p-4 text-left transition-all active:scale-95"
+                    style={{
+                      backgroundColor: pipActive ? `${cfg.activePillBg}22` : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${pipActive ? `${cfg.activePillBg}60` : "rgba(255,255,255,0.1)"}`,
+                    }}
+                  >
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
+                      style={{ backgroundColor: pipActive ? cfg.activePillBg : "rgba(255,255,255,0.08)" }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={pipActive ? "#fff" : cfg.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="18" height="14" x="3" y="3" rx="2" />
+                        <rect width="7" height="5" x="12" y="12" rx="1" fill={pipActive ? "#fff" : cfg.accent} stroke="none" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">Float it</p>
+                      <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "#a1a1aa" }}>
+                        {pipActive ? "Re-open floating bubble" : "Stays on top while you use other apps"}
+                      </p>
+                    </div>
+                    {pipActive && (
+                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: `${cfg.activePillBg}40`, color: cfg.accent }}>
+                        Active
+                      </span>
+                    )}
+                  </button>
+                )}
+                {notifSupported && (
+                  <button
+                    onClick={pinToNotifications}
+                    className="group flex flex-col items-start gap-3 rounded-xl p-4 text-left transition-all active:scale-95"
+                    style={{
+                      backgroundColor: pinned ? `${cfg.activePillBg}22` : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${pinned ? `${cfg.activePillBg}60` : "rgba(255,255,255,0.1)"}`,
+                    }}
+                  >
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
+                      style={{ backgroundColor: pinned ? cfg.activePillBg : "rgba(255,255,255,0.08)" }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={pinned ? "#fff" : cfg.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">
+                        {pinned ? "Unpin" : "Pin it"}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "#a1a1aa" }}>
+                        {pinned ? "Pinned to notification bar — tap to remove" : "Quick access from your notification bar"}
+                      </p>
+                    </div>
+                    {pinned && (
+                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: `${cfg.activePillBg}40`, color: cfg.accent }}>
+                        Pinned
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Result card */}
           {showResult && result && (
@@ -456,7 +495,7 @@ export default function AppPage() {
                     {result.mode === "translate" ? "Converted to English" : "Kept in your language"}
                   </span>
                 </div>
-                <span className="text-sm text-zinc-600">Auto-dismiss in 10s</span>
+                <span className="text-sm text-zinc-500">Auto-dismiss in 10s</span>
               </div>
               <div className="p-6">
                 {editText !== null ? (
@@ -517,7 +556,7 @@ export default function AppPage() {
                 {/* Dismiss */}
                 <button
                   onClick={handleDismiss}
-                  className="rounded-xl px-4 py-3 text-sm text-zinc-600 transition-colors hover:text-zinc-400"
+                  className="rounded-xl px-4 py-3 text-sm text-zinc-500 transition-colors hover:text-zinc-300"
                   style={{ border: "1px solid rgba(255,255,255,0.08)" }}
                 >
                   Dismiss
@@ -586,11 +625,11 @@ export default function AppPage() {
         >
           <div>
             <h2 className="text-base font-semibold text-white">History</h2>
-            <p className="text-xs text-zinc-500">Last {historyItems.length} of 10 saved locally</p>
+            <p className="text-xs text-zinc-400">Last {historyItems.length} of 10 saved locally</p>
           </div>
           <div className="flex items-center gap-3">
             {historyItems.length > 0 && (
-              <button onClick={clearHistory} className="text-xs text-zinc-600 transition-colors hover:text-red-400">
+              <button onClick={clearHistory} className="text-xs text-zinc-500 transition-colors hover:text-red-400">
                 Clear all
               </button>
             )}
@@ -606,11 +645,11 @@ export default function AppPage() {
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {historyItems.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
                 <path d="M12 7v5l4 2" />
               </svg>
-              <p className="text-sm text-zinc-600">No recordings yet.<br />Your conversions will appear here.</p>
+              <p className="text-sm text-zinc-500">No recordings yet.<br />Your conversions will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -618,7 +657,7 @@ export default function AppPage() {
                 <div
                   key={item.id}
                   className="group rounded-xl p-4 transition-colors"
-                  style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
+                  style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -630,7 +669,7 @@ export default function AppPage() {
                       >
                         {item.mode === "translate" ? "→ English" : "As spoken"}
                       </span>
-                      <span className="text-xs text-zinc-600">{timeAgo(item.timestamp)}</span>
+                      <span className="text-xs text-zinc-500">{timeAgo(item.timestamp)}</span>
                     </div>
                     <button
                       onClick={() => {
@@ -638,7 +677,7 @@ export default function AppPage() {
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}
-                      className="rounded-lg p-1.5 text-zinc-600 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/5 hover:text-zinc-300"
+                      className="rounded-lg p-1.5 text-zinc-500 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/5 hover:text-zinc-200"
                       title="Copy"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -655,7 +694,7 @@ export default function AppPage() {
 
         {/* Footer note */}
         <div
-          className="px-6 py-4 text-center text-xs text-zinc-700"
+          className="px-6 py-4 text-center text-xs text-zinc-500"
           style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
         >
           Stored locally in your browser · Never sent to a server

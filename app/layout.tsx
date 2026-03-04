@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import SwRegistrar from "@/components/SwRegistrar";
+
+const GA_ID = "G-FVBM65R4KJ";
 
 const geist = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +47,13 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
+      <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+      <Script id="ga-init" strategy="afterInteractive">{`
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', '${GA_ID}');
+      `}</Script>
       <body className={`${geist.variable} antialiased`}>
         <SwRegistrar />
         {children}
