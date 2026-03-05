@@ -78,39 +78,41 @@ Bolkar serves three distinct user segments through two product modes. Dictate Mo
 
 | Segment | Who They Are | Core Need | Mode Used | TAM (India) |
 |---|---|---|---|---|
-| Urban Professional | IT, BFSI, consulting, startup employees in metro cities. Often speak Hinglish but need professional English output for work. | Speak Hinglish naturally, get clean English output for emails, Slack, WhatsApp | Translate Mode | ~50 to 60M knowledge workers; SAM ~5 to 8M at 10% adoption |
-| Developer / Knowledge Worker | Software engineers, PMs, designers. Live in VS Code, Jira, Notion, GitHub. High willingness to pay for productivity tools. | Stay in flow — dictate in any language and get text back in that same language, no keyboard needed | Dictate Mode | ~4.3M software engineers in India; SAM ~430K at 10% adoption |
-| Vernacular-First / Language Bridge | Tier-2/3 city professionals, SMB owners, regional salespeople. Think and speak in Hindi/Tamil/Telugu but need English output for work. | Speak in any Indian language, get professional English text, bridge the language gap entirely | Translate Mode | ~500M non-English internet users; addressable ~50M at 10% |
+| Urban Professional | IT, BFSI, consulting, startup employees in metro cities. Often speak Hinglish but need professional English output for work. | Speak Hinglish naturally, get clean English output for emails, Slack, WhatsApp | Translate Mode | ~10-15M metro office workers actively using English for work; SAM ~300K-500K at 3-4% early adoption |
+| Developer / Knowledge Worker | Software engineers, PMs, designers. Live in VS Code, Jira, Notion, GitHub. High willingness to pay for productivity tools. | Stay in flow — dictate in any language and get text back in that same language, no keyboard needed | Dictate Mode | ~4.3M software engineers in India (NASSCOM); SAM ~150K-250K product/startup devs at 4-6% adoption |
+| Vernacular-First / Language Bridge | Tier-2/3 city professionals, SMB owners, regional salespeople. Think and speak in Hindi/Tamil/Telugu but need English output for work. | Speak in any Indian language, get professional English text, bridge the language gap entirely | Translate Mode | ~60-80M Tier-2/3 working professionals with English-output need; freemium SAM ~1.5-3M at 2-4% |
 
 ### 4.2 TAM and SAM Summary
 
-| Segment | TAM | SAM (10% Adoption) | ARPU (Monthly) | Revenue Potential |
+| Segment | TAM | SAM | ARPU (Monthly) | Revenue at Full SAM Paid |
 |---|---|---|---|---|
-| Urban Professional | ~50 to 60M | ~5 to 8M | Rs. 299/mo | ~Rs. 15,000 to 24,000 Cr/yr |
-| Developer / KW | ~4.3M | ~430K | Rs. 499/mo | ~Rs. 2,600 Cr/yr |
-| Vernacular Bridge | ~500M | ~50M | Rs. 99/mo (freemium) | ~Rs. 6,000 Cr/yr |
+| Urban Professional | ~10-15M | ~300K-500K (3-4% adoption) | Rs. 149/mo | ~Rs. 540-900 Cr/yr |
+| Developer / KW | ~4.3M | ~150K-250K (4-6% adoption) | Rs. 299/mo | ~Rs. 540-900 Cr/yr |
+| Vernacular Bridge | ~60-80M | ~1.5-3M freemium; ~75K-150K paid (5% conversion) | Rs. 79/mo | ~Rs. 71-142 Cr/yr |
 
-> Note: Revenue potential figures are illustrative upper bounds at full SAM penetration. Realistic Year 1 targets are 1 to 2% of SAM per segment. The vernacular segment monetisation assumes a freemium model with conversion to paid at ~5%.
+> Note: Revenue figures are theoretical ceilings at full SAM paid penetration — not projections. Realistic Year 1 target is 0.5-1% of SAM per segment (~2,500-7,500 total paying users, ~Rs. 4-15 Cr ARR). Indian SaaS adoption benchmarks and freemium-to-paid conversion (~2-5% in India) are factored in. The original 10% adoption figure used US market assumptions; India productivity SaaS typically sees 2-4% early adoption.
 
 ---
 
 ## 5. Product Modes
 
-### 5.1 Dictate Mode
+### 5.1 Dictate Mode / As Spoken
 
 User speaks in any language (English, Hindi, Tamil, Telugu, Bengali, or any of Sarvam's 22 supported languages) and gets text back in that same language. Output is clean and formatted, with filler words and stutters removed. The language of output always matches the language of input. Automatic language detection means users never need to manually select their language.
 
+- **UI label:** "As Spoken" (cycles through "जैसे बोला", "ਜਿਵੇਂ ਬੋਲਿਆ", "যেভাবে বললাম", "பேசியபடி", "જેમ બોલ્યા")
 - **Target users:** Developers, knowledge workers, content creators writing in their native language
-- **API used:** Sarvam /speech-to-text, Saaras v3, mode=transcribe, language_code=unknown for auto-detection
+- **API used:** `POST https://api.sarvam.ai/speech-to-text`, model=`saaras:v3`, language_code=`unknown` (auto-detects all 22 languages)
 - **Example (Hindi):** User says "aaj ki meeting ka summary likho" → Output: "आज की meeting का summary लिखो"
 - **Example (English):** User says "open a pull request for the auth module" → Output: "Open a pull request for the auth module."
 
-### 5.2 Translate Mode
+### 5.2 Translate Mode / To English
 
 User speaks in any language, including Hinglish, Hindi, Tamil, Telugu, or any Indian language, and always gets clean professional English text as output. This is the mode for anyone whose professional world demands English but who thinks and speaks in another language. Hinglish is explicitly supported: a user who naturally code-switches between Hindi and English will get polished English output, not a literal transcription.
 
+- **UI label:** "To English" (cycles through "अंग्रेज़ी में", "ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ", "ইংরেজিতে", "ஆங்கிலத்தில்", "અંગ્રેજીમાં")
 - **Target users:** Urban professionals (Hinglish speakers), vernacular-first users, SMB owners, regional salespeople
-- **API used:** Sarvam /speech-to-text, Saaras v3, mode=translate
+- **API used:** `POST https://api.sarvam.ai/speech-to-text-translate`, model=`saaras:v3`, language_code=`unknown` (separate endpoint from Dictate — handles translation natively)
 - **Example (Hinglish):** User says "yaar send karo woh report to Rahul by EOD" → Output: "Please send the report to Rahul by end of day."
 - **Example (Tamil):** User says "Naan innikku meeting la irukken, call pannatheenga" → Output: "I am in a meeting today, please do not call."
 
@@ -120,35 +122,37 @@ User speaks in any language, including Hinglish, Hindi, Tamil, Telugu, or any In
 
 ### 6.1 Phasing Strategy: Why This Order?
 
-The phasing strategy is driven by three principles: build for the broadest reach first with a single codebase, validate the core value proposition before investing in native builds, and expand monetisation once retention is proven.
+The phasing strategy is driven by four principles: build for the broadest reach first with a single codebase, validate the core value proposition before investing in native builds, expand monetisation once retention is proven, and gate platform investments behind real usage signals and feedback.
 
 - **Principle 1:** A single PWA codebase serves both desktop and Android in Phase 1. Desktop covers the browser-first workflow of professionals and developers. Android is served via the notification tray, which gives near-omnipresent access without requiring a native app.
 - **Principle 2:** Phase 2 invests in a native Android app only after Phase 1 has validated that users find enough value to return daily. The notification tray approach intentionally leaves some friction in place to test true demand before removing it.
 - **Principle 3:** Phase 3 expands to iOS and B2B, capturing the premium urban segment and unlocking enterprise-level ARPU. This is a monetisation phase, not just a platform expansion.
+- **Principle 4:** Phase 1 ships without authentication or paywalls deliberately. The goal is to remove every possible barrier to first use, maximise the number of users who experience the product, and accumulate real transcription and translation data across languages and accents. Auth, tiered pricing, and rate limiting are introduced in later phases once the feedback loop is established and the usage patterns are understood.
 
 ### 6.2 Phase Details
 
-#### Phase 1: PWA — Desktop and Android (4 Days)
+#### Phase 1: PWA — Desktop and Android
 
-**What it is:** A single Progressive Web App codebase that works on both desktop browsers and Android. On desktop, a floating draggable bubble persists across all browser tabs. On Android, the PWA is installed to the home screen and surfaces a persistent notification in the Android notification tray, giving users access to Bolkar from any app by pulling down the tray, tapping the mic, and pasting the result.
+**What it is:** A single Progressive Web App codebase that works on both desktop and Android. On desktop, a floating draggable bubble sits on top of all apps system-wide — not just the browser. Users tap the mic, speak, and the result is auto-copied to clipboard, ready to paste into any app (VS Code, Figma, Slack, Gmail, Notion, or anything else). On Android, the PWA is installed to the home screen and surfaces a persistent notification in the Android notification tray — pull down the tray, tap the mic, speak, and paste the result into any app.
 
 **Key Features:**
-- Desktop: floating draggable mic bubble across all browser tabs
-- Desktop: Cmd/Ctrl+Shift+B keyboard shortcut to trigger recording
-- Desktop: works in Gmail, WhatsApp Web, Notion, Slack Web, Google Docs
+- Desktop: floating draggable mic bubble that works across all apps system-wide
+- Desktop: text auto-copied to clipboard on result — paste into any app (VS Code, Figma, Slack, Gmail, Notion, Google Docs, etc.)
 - Android: installable to home screen via Chrome prompt
 - Android: persistent notification in the tray with a one-tap mic button
 - Android: text auto-copied to clipboard, paste into any app
-- Both: Dictate Mode (speak any language, get text back in that same language)
-- Both: Translate Mode (speak any language including Hinglish, get clean English)
+- Both: As Spoken / Dictate Mode (speak any language, get text back in that same language)
+- Both: To English / Translate Mode (speak any language including Hinglish, get clean English)
 - Both: automatic language detection, no manual selection needed
 - Both: local conversion history — last 10 results stored in the browser, recoverable if the tab is closed accidentally
 
 **Primary Segment:** Urban Professionals, Developers and Vernacular-First Users
 
-**Why this order:** A PWA is a single codebase that runs on both platforms. Desktop covers the browser-first workflow of professionals and developers. The Android notification tray approach delivers roughly 80% of the native floating bubble experience at a fraction of the build cost, making it the right MVP choice before investing in a full native app.
+**Why this order:** A PWA is a single codebase that runs on both platforms. On desktop, the floating bubble is already a true system-wide overlay — not browser-limited — giving professionals and developers full cross-app dictation from day one. The Android notification tray approach delivers a comparable experience on mobile at a fraction of the build cost, making it the right MVP choice before investing in a full native app.
 
-#### Phase 2: Native Android App + Personalisation (10 Days)
+**Phase 1 Objective — Proof of Concept and Demand Validation:** Phase 1 ships with no login wall, no usage caps, and no payment gate. The goal is simple: put the product in front of real users and answer the core question — do people find this useful enough to come back? All history is stored locally in the browser; no session data or transcriptions are sent to or saved on Bolkar's servers. Success signals at this stage are qualitative: word-of-mouth shares, unprompted return visits, and direct user feedback. These signals directly determine whether Phase 2 investment in a native app and server-side infrastructure is justified.
+
+#### Phase 2: Native Android App + Personalisation + Auth
 
 **What it is:** A full native Android app with the SYSTEM_ALERT_WINDOW permission, enabling a true floating bubble that appears over any other app on the device. This removes the copy-paste step entirely and makes Bolkar feel truly omnipresent. Phase 2 also introduces the first personalisation layer, turning the local history into a learning engine.
 
@@ -167,9 +171,11 @@ The phasing strategy is driven by three principles: build for the broadest reach
 
 **Primary Segment:** All Three Segments: Full Market
 
+**Auth, Data Collection and Rate Limiting (introduced in Phase 2):** Phase 2 introduces OAuth login (Google and phone number), enabling cross-device history sync, personalisation persistence, and a stable user identity for rate limiting. With auth in place, Bolkar can begin collecting real usage signal server-side for the first time: which mode users prefer, how often they re-record, which languages are most common, and where the Sarvam API struggles. This data informs Phase 3 pricing tiers and future model fine-tuning. A freemium tier with a monthly transcription cap and a paid tier with unlimited usage are introduced here, validated by the demand signals from Phase 1.
+
 **Why this order:** The notification tray approach has friction. A native app removes it entirely. This phase is justified once Phase 1 has validated that users find enough value to return daily.
 
-#### Phase 3: iOS and B2B Expansion (20 Days)
+#### Phase 3: iOS and B2B Expansion
 
 **What it is:** iOS support via a native app or optimised PWA depending on Apple platform constraints, plus a B2B team plan with shared voice shortcuts, admin controls and enterprise-grade privacy compliance.
 
@@ -192,118 +198,168 @@ The phasing strategy is driven by three principles: build for the broadest reach
 
 Bolkar uses a click-to-start, click-to-stop recording model rather than hold-to-record. This is a deliberate decision for the Indian user context: vernacular users and professionals often dictate longer messages rather than quick one-liners, making hold-to-record tiring and impractical. A single click to start and a single click to stop keeps the interaction low-friction for both short and long dictations.
 
-### 7.2 The Bubble: Three States
+### 7.2 App Interface: Four States
 
-The floating bubble is the entire product interface. It has three distinct visual states.
+The main interface is a full-page dark-themed web app at `/app`. The background colour and glow shift with the active mode — violet for To English, blue for As Spoken — giving an immediate visual cue as to which mode is active. The interface has four states.
 
 #### State 1: Idle
 
-The bubble is resting in the corner of the screen, unobtrusive and out of the way.
-
-- Mic icon in brand blue, neutral and inviting
-- Mode toggle visible below the mic showing current mode: "Dictate" or "Translate"
-- The toggle is a pressable switch, tappable independently of the mic button
-- No other elements — minimal and clean
+- Mode toggle at the top (see 7.3)
+- Rotating example card below the toggle (see 7.4)
+- Large circular mic button with an ambient glow ring coloured to the active mode
+- Live waveform below the mic (rendered in the mode accent colour when idle)
+- "Click the mic to start" hint
+- "Use Bolkar anywhere" section if the device supports PiP or notifications (see 7.5)
 
 #### State 2: Recording
 
-User has clicked the mic. The bubble signals active recording clearly.
+- Mic button turns red with a dual-layer pulse-ring animation
+- Live waveform becomes active, reflecting actual audio input in real time
+- Recording timer in red below the waveform
+- "Recording — click to stop" hint
+- Mode toggle is disabled — mode cannot be switched mid-recording
+- A second click on the mic stops recording and triggers the API call
 
-- Mic icon turns red with a slow pulse animation
-- A small waveform animation appears to confirm audio is being picked up
-- A subtle timer shows recording duration (e.g. 0:04)
-- The mode toggle is greyed out and non-interactive — mode cannot be switched mid-recording
-- A second click on the mic stops recording
+#### State 3: Processing
 
-#### State 3: Result Ready
+- Mic button shows a spinner on a dark background
+- "Processing your speech…" hint
+- Brief intermediate state while Sarvam responds
 
-Recording has stopped and the Sarvam API has returned the transcription or translation.
+#### State 4: Result
 
-- Transcribed or translated text appears in a card that expands above the bubble
-- Text is auto-copied to clipboard immediately
-- A "Copied!" toast confirms the copy
-- The result card has three actions:
-  - **Re-record:** dismiss the result and start a fresh recording
-  - **Edit:** open the text inline for quick correction before copying again
-  - **Dismiss:** close the card and return to idle state
-- The card auto-dismisses after 10 seconds if the user takes no action
+- Result card appears below the mic area
+- Header: green status dot + mode label ("Converted to English" or "Kept in your language") + animated speed badge showing Sarvam API response time
+- Text is auto-copied to clipboard immediately; a "Copied to clipboard" toast slides in at the bottom of the screen
+- Three actions:
+  - **Copy** (primary, full-width): copies the current text, button shows "Copied!" on success
+  - **Edit**: switches to an inline textarea for quick correction; button becomes "Copy edited"
+  - **Dismiss**: returns to idle immediately
+- Card auto-dismisses after 10 seconds if no action is taken
 
-> **On errors:** If the transcription is clearly wrong, the user can tap Re-record for a fresh attempt, or tap Edit to fix the text inline. This avoids the frustration of having to start the whole flow over.
+> **On errors:** A red error card appears with the error message and a "Try again →" link that resets to idle.
 
-### 7.3 Mode Toggle Behaviour
+### 7.3 Mode Toggle
 
-The Dictate / Translate toggle sits below the mic button and is always visible in the idle state.
+The "To English" / "As Spoken" toggle sits at the top of the interface above the example card.
 
-- Tapping the toggle switches mode instantly with a small animation
-- The toggle label updates to reflect the new mode
-- The selected mode persists across sessions — if you used Translate Mode last time, it opens in Translate Mode next time
-- During onboarding, users are asked which mode they want as their default, so most users will rarely need to touch the toggle
+- Two pill buttons side by side — active mode is highlighted with a filled colour (violet for To English, blue for As Spoken)
+- The primary label on each pill cycles through 7 languages every 2.5 seconds — English, Hindi, Tamil, Telugu, Bengali, Kannada, Marathi — with a fade + slide animation. The cycling is synchronised with the example card so both always show the same language.
+- A static subtitle hint sits below each label: "Speak any language → English" and "Speak → text in same language"
+- Switching mode is instant and locked during recording or processing
+- The selected mode persists in localStorage and is restored on next visit
 
-### 7.4 Desktop UX Flow
+### 7.4 Rotating Example Card
+
+Below the mode toggle, a two-column card demonstrates what Bolkar does in the current mode.
+
+- **Left column ("You say"):** an italicised input phrase with a language chip (e.g. "Hinglish", "Tamil")
+- **Right column ("Bolkar outputs"):** the output text with an output-language chip coloured to the active mode
+- Cycles automatically every 5 seconds with a fade + upward-slide transition
+- Dot indicators at the bottom allow manual navigation between examples
+- The example set resets when the mode is switched (To English has 6 examples across Hinglish, Hindi, Tamil, Telugu, Bengali, Kannada; As Spoken has 6 across Hindi, Tamil, Telugu, Bengali, Kannada, Marathi)
+
+### 7.5 Use Bolkar Anywhere
+
+Shown in the idle state when the device/browser supports at least one of the following options:
+
+- **Float it** (Desktop, Chrome only): launches a Document Picture-in-Picture window — a compact always-on-top bubble that stays visible while the user works in other apps. Full recording functionality is available inside the PiP window. The button shows an "Active" badge while the PiP window is open.
+- **Pin it** (Android / Chrome with notification permission): pins a persistent notification to the Android notification bar. Tapping the notification opens Bolkar from any app. The button toggles to "Unpin" and shows a "Pinned" badge when active.
+
+### 7.6 History Panel
+
+Accessible via the "History" button in the top nav (shows a count badge when items exist).
+
+- Slide-in panel from the right edge (full height, 384px wide on desktop)
+- Shows up to the 10 most recent conversions, stored locally in the browser — never sent to a server
+- Each item shows: mode badge ("→ English" in violet or "As spoken" in blue), relative timestamp (e.g. "2m ago"), API speed badge, and up to 3 lines of the transcript
+- Hover over any item to reveal a copy button
+- "Clear all" button in the panel header
+- Footer reminder: "Stored locally in your browser · Never sent to a server"
+
+### 7.7 Desktop UX Flow
 
 | Step | Action | Description |
 |---|---|---|
-| 1 | Install PWA | User visits bolkar.app and installs via browser prompt. Bubble appears pinned to bottom-right. |
-| 2 | Select Mode | User checks the toggle below the mic. Default is set during onboarding. |
-| 3 | Trigger Recording | User clicks mic button or presses Cmd+Shift+B. Bubble enters Recording state. |
-| 4 | Speak | User speaks naturally. No special commands needed. Just talk. |
-| 5 | Stop Recording | User clicks mic again. API call is made to Sarvam. |
-| 6 | Result Appears | Text appears in the card above the bubble and is auto-copied to clipboard. |
-| 7 | Paste | User clicks into their target app and presses Cmd+V. Done. |
+| 1 | Open Bolkar | User visits bolkar.app/app in their browser. Can install as a PWA from the browser prompt. |
+| 2 | Select mode | Toggle between "To English" and "As Spoken" at the top. Last used mode is remembered. |
+| 3 | Float it (optional) | Click "Float it" to launch a PiP bubble that stays on top while working in other apps. |
+| 4 | Click the mic | App enters Recording state. Mic turns red, waveform activates. |
+| 5 | Speak | User speaks naturally. Live waveform confirms audio is being captured. |
+| 6 | Click to stop | Click mic again. API call is made to Sarvam. |
+| 7 | Copy and paste | Text appears and is auto-copied to clipboard. User pastes into any app with Cmd+V. |
 
-### 7.5 Android Notification Tray Flow
-
-On Android, Bolkar surfaces through the system notification tray rather than a floating bubble. This gives users access to the mic from any native app without requiring a full native build.
+### 7.8 Android UX Flow
 
 | Step | Action | Description |
 |---|---|---|
-| 1 | Install PWA | User visits bolkar.app on Chrome for Android and installs via browser prompt. Bolkar is added to home screen. |
-| 2 | Persistent Notification | Bolkar places a persistent notification in the Android tray with a mic icon. This stays active as long as Bolkar is running. |
-| 3 | Trigger from Anywhere | User is in WhatsApp, Gmail, Instagram or any app. They pull down the notification tray and tap the Bolkar mic button. |
-| 4 | Select Mode and Speak | A minimal recording UI appears as a bottom sheet. User verifies mode (Dictate or Translate) and speaks. |
-| 5 | Text Auto-Copied | Transcribed or translated text is instantly copied to clipboard. A confirmation toast appears. |
-| 6 | Paste into Any App | User returns to their app and pastes with a long-press. The entire flow takes under 10 seconds. |
-
-> **Note:** The notification tray approach delivers approximately 80% of the native floating bubble experience with significantly lower build complexity. The one extra step of returning to the app to paste is a deliberate MVP tradeoff, validated before investing in a full native Android app in Phase 2.
+| 1 | Open Bolkar | User visits bolkar.app/app on Chrome for Android. Can install as a PWA to the home screen. |
+| 2 | Pin it (optional) | Tap "Pin it" to add a persistent notification to the Android notification bar for quick access. |
+| 3 | Trigger from anywhere | Pull down the notification bar and tap the Bolkar notification to open the app. |
+| 4 | Select mode and speak | Choose mode, tap mic, speak, tap to stop. |
+| 5 | Copy and paste | Text is auto-copied to clipboard. Return to any app and paste with a long-press. |
 
 ---
 
 ## 8. Sarvam API Integration
 
-Bolkar is powered entirely by Sarvam AI's Saaras v3 model, the most capable Indian language ASR model available, supporting 22 languages with automatic language detection and multiple output modes.
+Bolkar is powered entirely by Sarvam AI's Saaras v3 model, supporting 22 Indian languages with automatic language detection. The two product modes map to two distinct Sarvam endpoints — not parameters on the same endpoint.
 
-| Feature | Sarvam API Used | Notes |
-|---|---|---|
-| Dictate Mode | /speech-to-text: Saaras v3, mode=transcribe | Output language matches input language. Supports all 22 Indian languages plus English. |
-| Translate Mode | /speech-to-text: Saaras v3, mode=translate | Any language including Hinglish, converted to clean English in one API call. |
-| Language Auto-Detection | language_code=unknown parameter | User never needs to manually select their language. Sarvam detects automatically. |
-| Real-time (Phase 2+) | WebSocket Streaming API: Saaras v3 | Sub-second latency for live transcription in the native Android app. |
+| Feature | Endpoint | Request | Notes |
+|---|---|---|---|
+| As Spoken (Dictate) | `POST https://api.sarvam.ai/speech-to-text` | `model=saaras:v3`, `language_code=unknown`, `file=<audio>` | Output language matches input language. Auto-detects all 22 Indian languages plus English. |
+| To English (Translate) | `POST https://api.sarvam.ai/speech-to-text-translate` | `model=saaras:v3`, `language_code=unknown`, `file=<audio>` | Any language including Hinglish, converted to clean English in one API call. Separate endpoint from As Spoken. |
+| Language Auto-Detection | Both endpoints | `language_code=unknown` | User never needs to manually select a language. Sarvam detects automatically on every call. |
+| Auth | Both endpoints | Header: `api-subscription-key: <SARVAM_API_KEY>` | API key stored server-side in `.env.local`, never exposed to the client. |
+| Audio format | Both endpoints | `file` field as `recording.webm` | Audio recorded in WebM format via the browser MediaRecorder API and sent as FormData. |
+| Response | Both endpoints | JSON `{ transcript: string }` | Processing time is measured client-side and shown as the speed badge in the result card. |
+| Real-time streaming (Phase 2+) | Sarvam WebSocket API | Saaras v3 streaming | Sub-second latency for live transcription in the native Android app. Not used in Phase 1. |
 
 ---
 
 ## 9. Success Metrics
 
+All Phase 1 metrics are measured via Google Analytics (GA4, property `G-FVBM65R4KJ`). The current integration tracks page views, sessions, users, engagement, and geography automatically. Custom events will be added in Phase 2 to track recording-level behaviour.
+
 ### Phase 1: PWA (Desktop and Android)
 
-- 500 installs within first month of launch
-- 40% Day-7 retention (user records at least once in Week 2)
-- Average session: 3 or more recordings per day
-- NPS above 50 among early users
-- Translate Mode used by more than 20% of users (signals vernacular TAM validation)
+Measurable via GA4 base setup:
+
+| Metric | Target | GA4 Signal |
+|---|---|---|
+| Total users on `/app` | 1,000 users in first month | Users report, filtered to `/app` page |
+| Returning users | >20% of sessions are returning users | New vs returning user report |
+| Engaged sessions on `/app` | >50% engagement rate | Engaged sessions (>10s + interaction) |
+| India traffic share | >70% of users from India | Geography report |
+| Mobile vs desktop split | Understand device mix | Device category report |
+| Landing → `/app` conversion | >30% of landing page visitors open the app | Page path report: `/` → `/app` |
+| Traffic sources | Majority from direct/social (word of mouth signal) | Acquisition report |
+
+> **What requires custom events (Phase 2):** recording count per session, mode preference (To English vs As Spoken), copy vs dismiss vs edit actions, re-record rate, PiP and notification pin usage.
 
 ### Phase 2: Native Android App
 
-- 10,000 installs within 60 days of launch
-- Translate Mode adoption above 50% on mobile (vs ~20% on desktop)
-- 30-day retention above 25%
-- Re-record rate below 15% (signals transcription quality is acceptable)
+Phase 2 will add `gtag('event', ...)` custom events for recording-level actions. Metrics to target once instrumented:
+
+| Metric | Target | How Measured |
+|---|---|---|
+| Total users on `/app` | 5,000 users/month | GA4 users report |
+| Returning users | >35% returning | GA4 new vs returning |
+| Mode split | Understand To English vs As Spoken ratio | Custom event: `mode_selected` |
+| Recording completion rate | >80% of recordings reach result state | Custom events: `recording_started`, `result_shown` |
+| Copy rate | >70% of results are copied | Custom event: `result_copied` |
+| Re-record rate | <20% | Custom event: `recording_started` immediately after `result_shown` |
 
 ### Phase 3: iOS and B2B
 
-- 100,000 MAU within 6 months of launch
-- 5% free-to-paid conversion
-- First B2B team deal signed
-- ARPU 3x higher on B2B vs individual plan
+Phase 3 introduces auth and payments. Metrics shift to revenue and retention:
+
+| Metric | Target | How Measured |
+|---|---|---|
+| MAU | 25,000 MAU | GA4 monthly active users |
+| Free-to-paid conversion | >3% | Payment events + GA4 funnel |
+| India share maintained | >65% | Geography report |
+| B2B team deals | First deal signed | Qualitative / CRM |
 
 ---
 

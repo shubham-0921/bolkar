@@ -4,11 +4,50 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import * as ReactDOM from "react-dom/client";
 import Link from "next/link";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import dynamic from "next/dynamic";
 import PipBubble from "@/components/PipBubble";
 import { useModeLabels } from "@/hooks/useModeLabels";
+import { TRANSLATE_EXAMPLES, DICTATE_EXAMPLES } from "@/lib/examples";
+
+const LiveWaveform = dynamic(() => import("@/components/LiveWaveform"), {
+  ssr: false,
+  loading: () => <div style={{ width: 198, height: 52 }} />,
+});
 import { useHistory, timeAgo } from "@/hooks/useHistory";
+import BolkarLogo from "@/components/BolkarLogo";
 
 type Mode = "transcribe" | "translate";
+
+// Animated count-up badge showing Sarvam's response time
+function SpeedBadge({ ms }: { ms: number }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    const duration = 700;
+    const start = Date.now();
+    const tick = () => {
+      const p = Math.min((Date.now() - start) / duration, 1);
+      // ease-out: fast start, slows down
+      setDisplay(Math.round(ms * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [ms]);
+  return (
+    <div
+      className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
+      style={{ backgroundColor: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)" }}
+      title="Sarvam AI response time"
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="#fbbf24" stroke="none">
+        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+      </svg>
+      <span className="text-xs font-semibold tabular-nums" style={{ color: "#fbbf24" }}>
+        {(display / 1000).toFixed(1)}s
+      </span>
+    </div>
+  );
+}
+
 
 const modeConfig = {
   translate: {
@@ -39,6 +78,7 @@ const modeConfig = {
   },
 };
 
+
 export default function AppPage() {
   const [mode, setMode] = useState<Mode>("translate");
   const [copied, setCopied] = useState(false);
@@ -48,11 +88,13 @@ export default function AppPage() {
   const [notifSupported, setNotifSupported] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [exampleIdx, setExampleIdx] = useState(0);
+  const [exampleVisible, setExampleVisible] = useState(true);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pipRootRef = useRef<ReturnType<typeof ReactDOM.createRoot> | null>(null);
   const pipWindowRef = useRef<Window | null>(null);
 
-  const { state, result, error, formattedDuration, startRecording, stopRecording, reset } =
+  const { state, result, error, liveStream, formattedDuration, startRecording, stopRecording, reset } =
     useAudioRecorder();
   const { items: historyItems, addItem: addToHistory, clearHistory } = useHistory();
 
@@ -73,9 +115,28 @@ export default function AppPage() {
     localStorage.setItem("bolkar-mode", m);
   };
 
+  // Reset example index when mode changes
+  useEffect(() => {
+    setExampleIdx(0);
+    setExampleVisible(true);
+  }, [mode]);
+
+  // Cycle through examples: show for 4.5s, fade out 500ms, swap, fade in
+  useEffect(() => {
+    const examples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
+    const interval = setInterval(() => {
+      setExampleVisible(false);
+      setTimeout(() => {
+        setExampleIdx(i => (i + 1) % examples.length);
+        setExampleVisible(true);
+      }, 500);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [mode]);
+
   useEffect(() => {
     if (state === "result" && result?.transcript) {
-      addToHistory(result.transcript, result.mode);
+      addToHistory(result.transcript, result.mode, result.processingMs);
       navigator.clipboard.writeText(result.transcript).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 3000);
@@ -172,7 +233,8 @@ export default function AppPage() {
   const showResult = state === "result";
   const showError = state === "error";
   const cfg = modeConfig[mode];
-  const modeLabels = useModeLabels();
+  const activeExamples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
+  const modeLabels = useModeLabels(activeExamples[exampleIdx]?.labelIdx ?? 0);
 
   return (
     <div
@@ -184,10 +246,11 @@ export default function AppPage() {
       <div className="pointer-events-none absolute inset-0" style={{ background: modeConfig.transcribe.glow, opacity: mode === "transcribe" ? 1 : 0, transition: "opacity 0.7s ease" }} />
 
       {/* Nav */}
-      <nav className="relative z-10" style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", backgroundColor: "rgba(0,0,0,0.3)", backdropFilter: "blur(20px)" }}>
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-5">
-          <Link href="/" className="text-xl font-bold tracking-tight text-white">
-            bol<span className="transition-colors duration-300" style={{ color: cfg.accent }}>kar</span>
+      <nav className="relative z-10 sticky top-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(20px)" }}>
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-white">
+            <BolkarLogo size={26} />
+            <span>bol<span className="transition-colors duration-300" style={{ color: cfg.accent }}>kar</span></span>
           </Link>
           <div className="flex items-center gap-3">
             {/* History button */}
@@ -221,8 +284,12 @@ export default function AppPage() {
               <img
                 src="https://assets.sarvam.ai/assets/svgs/sarvam-logo-white.svg"
                 alt="Sarvam AI"
-                style={{ height: 17, opacity: 0.95 }}
+                style={{
+                  height: 17,
+                  filter: "drop-shadow(0 0 6px rgba(255,255,255,0.95)) drop-shadow(0 0 14px rgba(255,180,60,0.55))",
+                }}
               />
+              <span className="text-xs font-semibold" style={{ color: "#ffffff" }}>Sarvam</span>
             </div>
           </div>
         </div>
@@ -256,10 +323,13 @@ export default function AppPage() {
                     className="text-lg font-semibold"
                     style={{
                       display: "inline-block",
+                      width: "9rem",
+                      textAlign: "center",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
                       transition: "opacity 0.35s ease, transform 0.35s ease",
                       opacity: modeLabels.visible ? 1 : 0,
                       transform: modeLabels.visible ? "translateY(0px)" : "translateY(-6px)",
-                      whiteSpace: "nowrap",
                     }}
                   >{modeLabels.toEnglish}</span>
                 </div>
@@ -284,10 +354,13 @@ export default function AppPage() {
                     className="text-lg font-semibold"
                     style={{
                       display: "inline-block",
+                      width: "9rem",
+                      textAlign: "center",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
                       transition: "opacity 0.35s ease, transform 0.35s ease",
                       opacity: modeLabels.visible ? 1 : 0,
                       transform: modeLabels.visible ? "translateY(0px)" : "translateY(-6px)",
-                      whiteSpace: "nowrap",
                     }}
                   >{modeLabels.asSpoken}</span>
                 </div>
@@ -296,43 +369,63 @@ export default function AppPage() {
             </div>
           </div>
 
-          {/* Mode example card */}
-          <div
-            key={mode}
-            className="mb-10 animate-fade-in-up overflow-hidden rounded-2xl"
-            style={{ backgroundColor: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}
-          >
-            <div className="grid grid-cols-2">
-              <div className="p-4" style={{ borderRight: "1px solid rgba(255,255,255,0.1)" }}>
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#71717a" }}>You say</p>
-                <p className="text-sm italic text-zinc-300 leading-relaxed">
-                  {mode === "translate"
-                    ? '"yaar report bhejo EOD tak"'
-                    : '"kal subah 10 baje meeting hai"'}
-                </p>
-                <span
-                  className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                  style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#a1a1aa" }}
+          {/* Mode example card — revolving examples */}
+          {(() => {
+            const examples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
+            const ex = examples[exampleIdx];
+            return (
+              <div
+                key={mode}
+                className="mb-10 animate-fade-in-up overflow-hidden rounded-2xl"
+                style={{ backgroundColor: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}
+              >
+                <div
+                  className="grid grid-cols-2"
+                  style={{
+                    opacity: exampleVisible ? 1 : 0,
+                    transform: exampleVisible ? "translateY(0px)" : "translateY(6px)",
+                    transition: "opacity 0.45s ease, transform 0.45s ease",
+                  }}
                 >
-                  {mode === "translate" ? "Hinglish" : "Hindi"}
-                </span>
+                  <div className="p-4" style={{ borderRight: "1px solid rgba(255,255,255,0.1)", minHeight: "9rem" }}>
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#71717a" }}>You say</p>
+                    <p className="text-sm italic text-zinc-300 leading-relaxed">&ldquo;{ex.input}&rdquo;</p>
+                    <span
+                      className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#a1a1aa" }}
+                    >
+                      {ex.lang}
+                    </span>
+                  </div>
+                  <div className="p-4" style={{ minHeight: "9rem" }}>
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: cfg.accent }}>Bolkar outputs</p>
+                    <p className="text-sm font-medium text-white leading-relaxed">&ldquo;{ex.output}&rdquo;</p>
+                    <span
+                      className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ backgroundColor: `${cfg.activePillBg}30`, color: cfg.accent, border: `1px solid ${cfg.activePillBg}50` }}
+                    >
+                      {ex.outputLang}
+                    </span>
+                  </div>
+                </div>
+                {/* Dot indicators */}
+                <div className="flex justify-center gap-1.5 pb-3 pt-1">
+                  {examples.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => { setExampleVisible(false); setTimeout(() => { setExampleIdx(i); setExampleVisible(true); }, 300); }}
+                      className="rounded-full transition-all duration-300"
+                      style={{
+                        width: i === exampleIdx ? 16 : 6,
+                        height: 6,
+                        backgroundColor: i === exampleIdx ? cfg.accent : "rgba(255,255,255,0.2)",
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="p-4">
-                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: cfg.accent }}>Bolkar outputs</p>
-                <p className="text-sm font-medium text-white leading-relaxed">
-                  {mode === "translate"
-                    ? '"Please send the report by end of day."'
-                    : '"Kal subah 10 baje meeting hai."'}
-                </p>
-                <span
-                  className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                  style={{ backgroundColor: `${cfg.activePillBg}30`, color: cfg.accent, border: `1px solid ${cfg.activePillBg}50` }}
-                >
-                  {mode === "translate" ? "Professional English" : "Hindi text"}
-                </span>
-              </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Mic area */}
           <div className="flex flex-col items-center">
@@ -378,14 +471,16 @@ export default function AppPage() {
               </button>
             </div>
 
-            {isRecording && (
-              <div className="mb-5 flex items-center gap-2 animate-fade-in-up">
-                <div className="w-1.5 rounded-full bg-red-400 animate-waveform-1" style={{ height: 4 }} />
-                <div className="w-1.5 rounded-full bg-red-400 animate-waveform-2" style={{ height: 4 }} />
-                <div className="w-1.5 rounded-full bg-red-400 animate-waveform-3" style={{ height: 4 }} />
-                <div className="w-1.5 rounded-full bg-red-400 animate-waveform-4" style={{ height: 4 }} />
-                <div className="w-1.5 rounded-full bg-red-400 animate-waveform-5" style={{ height: 4 }} />
-                <span className="ml-2 text-base font-semibold tabular-nums text-red-400">{formattedDuration}</span>
+            {!isProcessing && !showResult && !showError && (
+              <div className="mb-5 flex flex-col items-center gap-3">
+                <LiveWaveform
+                  stream={liveStream}
+                  isRecording={isRecording}
+                  idleColor={cfg.accent}
+                />
+                {isRecording && (
+                  <span className="text-sm font-semibold tabular-nums text-red-400">{formattedDuration}</span>
+                )}
               </div>
             )}
 
@@ -495,7 +590,10 @@ export default function AppPage() {
                     {result.mode === "translate" ? "Converted to English" : "Kept in your language"}
                   </span>
                 </div>
-                <span className="text-sm text-zinc-500">Auto-dismiss in 10s</span>
+                <div className="flex items-center gap-2">
+                  <SpeedBadge ms={result.processingMs} />
+                  <span className="text-xs font-medium" style={{ color: "#a1a1aa" }}>Sarvam AI</span>
+                </div>
               </div>
               <div className="p-6">
                 {editText !== null ? (
@@ -670,6 +768,12 @@ export default function AppPage() {
                         {item.mode === "translate" ? "→ English" : "As spoken"}
                       </span>
                       <span className="text-xs text-zinc-500">{timeAgo(item.timestamp)}</span>
+                      {item.processingMs && (
+                        <div className="flex items-center gap-1 rounded-full px-1.5 py-0.5" style={{ backgroundColor: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.15)" }}>
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="#fbbf24" stroke="none"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+                          <span className="text-xs font-semibold tabular-nums" style={{ color: "#fbbf24" }}>{(item.processingMs / 1000).toFixed(1)}s</span>
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => {
