@@ -73,7 +73,7 @@ export default function Home() {
           <div>
             {/* Badge */}
             <div
-              className="mb-6 inline-flex items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-bold"
+              className="mb-6 inline-flex flex-wrap items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-bold"
               style={{ backgroundColor: "rgba(249,115,22,0.12)", border: "1.5px solid rgba(249,115,22,0.4)", color: "#fb923c", boxShadow: "0 0 20px rgba(249,115,22,0.15)" }}
             >
               <span className="text-base">🇮🇳</span>

@@ -276,7 +276,7 @@ export default function AppPage() {
               )}
             </button>
             <div
-              className="flex items-center gap-2 rounded-full px-3.5 py-2"
+              className="hidden sm:flex items-center gap-2 rounded-full px-3.5 py-2"
               style={{ backgroundColor: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)" }}
             >
               <span className="text-xs font-semibold" style={{ color: "#a1a1aa" }}>Made with</span>
@@ -308,7 +308,7 @@ export default function AppPage() {
               <button
                 onClick={() => setAndSaveMode("translate")}
                 disabled={isRecording || isProcessing}
-                className="flex flex-col items-center gap-1 rounded-xl px-8 py-4 transition-all duration-200 disabled:opacity-40"
+                className="flex flex-col items-center gap-1 rounded-xl px-3 sm:px-8 py-4 transition-all duration-200 disabled:opacity-40"
                 style={{
                   backgroundColor: mode === "translate" ? cfg.activePillBg : "transparent",
                   color: mode === "translate" ? "#ffffff" : "#a1a1aa",
@@ -320,10 +320,9 @@ export default function AppPage() {
                     <path d="m22 22-5-10-5 10" /><path d="M14 18h6" />
                   </svg>
                   <span
-                    className="text-lg font-semibold"
+                    className="text-lg font-semibold w-20 sm:w-36"
                     style={{
                       display: "inline-block",
-                      width: "9rem",
                       textAlign: "center",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -333,12 +332,12 @@ export default function AppPage() {
                     }}
                   >{modeLabels.toEnglish}</span>
                 </div>
-                <span className="text-xs font-medium opacity-70">Speak any language → English</span>
+                <span className="hidden sm:block text-xs font-medium opacity-70">Speak any language → English</span>
               </button>
               <button
                 onClick={() => setAndSaveMode("transcribe")}
                 disabled={isRecording || isProcessing}
-                className="flex flex-col items-center gap-1 rounded-xl px-8 py-4 transition-all duration-200 disabled:opacity-40"
+                className="flex flex-col items-center gap-1 rounded-xl px-3 sm:px-8 py-4 transition-all duration-200 disabled:opacity-40"
                 style={{
                   backgroundColor: mode === "transcribe" ? cfg.activePillBg : "transparent",
                   color: mode === "transcribe" ? "#ffffff" : "#a1a1aa",
@@ -351,10 +350,9 @@ export default function AppPage() {
                     <line x1="12" x2="12" y1="19" y2="22" />
                   </svg>
                   <span
-                    className="text-lg font-semibold"
+                    className="text-lg font-semibold w-20 sm:w-36"
                     style={{
                       display: "inline-block",
-                      width: "9rem",
                       textAlign: "center",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -364,7 +362,7 @@ export default function AppPage() {
                     }}
                   >{modeLabels.asSpoken}</span>
                 </div>
-                <span className="text-xs font-medium opacity-70">Speak → text in same language</span>
+                <span className="hidden sm:block text-xs font-medium opacity-70">Speak → text in same language</span>
               </button>
             </div>
           </div>

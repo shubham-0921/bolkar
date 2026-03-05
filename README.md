@@ -31,7 +31,7 @@ Bolkar is an India-first, zero-signup voice-to-text PWA. You speak — in Hindi,
 | Speech AI | [Sarvam AI](https://sarvam.ai) — Saaras v3 model |
 | PWA | `manifest.json` + Service Worker |
 | Analytics | Google Analytics GA4 |
-| Hosting | Vercel |
+| Hosting | GCP VM + nginx |
 
 ### Sarvam AI endpoints used
 
@@ -132,4 +132,4 @@ public/
 
 ---
 
-Built with [Sarvam AI](https://sarvam.ai) · Deployed on [Vercel](https://vercel.com)
+Built with [Sarvam AI](https://sarvam.ai) · Hosted on GCP with nginx
