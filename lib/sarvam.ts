@@ -18,7 +18,7 @@ export async function transcribeAudio(
   const formData = new FormData();
   formData.append("file", audioBlob, "recording.webm");
   formData.append("model", "saaras:v3");
-  // language_code omitted → Sarvam auto-detects
+  formData.append("language_code", "unknown"); // explicit auto-detect for all 22 languages
 
   console.log(`[sarvam] Calling ${url}, blob size: ${audioBlob.size} bytes`);
 

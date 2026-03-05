@@ -4,8 +4,8 @@
   "description": "Voice-to-text for India. Speak any Indian language, get clean text instantly.",
   "start_url": "/app",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "background_color": "#08030f",
+  "theme_color": "#7c3aed",
   "orientation": "portrait-primary",
   "categories": ["productivity", "utilities"],
   "icons": [

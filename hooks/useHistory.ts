@@ -10,6 +10,7 @@ export interface HistoryItem {
   transcript: string;
   mode: "transcribe" | "translate";
   timestamp: number;
+  processingMs?: number;
 }
 
 function load(): HistoryItem[] {
@@ -30,13 +31,14 @@ function save(items: HistoryItem[]) {
 export function useHistory() {
   const [items, setItems] = useState<HistoryItem[]>(() => load());
 
-  const addItem = useCallback((transcript: string, mode: "transcribe" | "translate") => {
+  const addItem = useCallback((transcript: string, mode: "transcribe" | "translate", processingMs?: number) => {
     if (!transcript.trim()) return;
     const entry: HistoryItem = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       transcript,
       mode,
       timestamp: Date.now(),
+      processingMs,
     };
     setItems((prev) => {
       const updated = [entry, ...prev].slice(0, MAX_ITEMS);

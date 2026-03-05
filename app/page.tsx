@@ -2,6 +2,7 @@ import Link from "next/link";
 import UseCaseAccordion from "@/components/UseCaseAccordion";
 import BolAnimation from "@/components/BolAnimation";
 import LanguageChips from "@/components/LanguageChips";
+import BolkarLogo from "@/components/BolkarLogo";
 
 export default function Home() {
   return (
@@ -28,8 +29,9 @@ export default function Home() {
         }}
       >
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-xl font-bold tracking-tight text-white">
-            bol<span style={{ color: "#c4b5fd" }}>kar</span>
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-white">
+            <BolkarLogo size={26} />
+            <span>bol<span style={{ color: "#c4b5fd" }}>kar</span></span>
           </Link>
           <div className="flex items-center gap-3">
             <div
@@ -41,8 +43,12 @@ export default function Home() {
               <img
                 src="https://assets.sarvam.ai/assets/svgs/sarvam-logo-white.svg"
                 alt="Sarvam AI"
-                style={{ height: 18, opacity: 1 }}
+                style={{
+                  height: 18,
+                  filter: "drop-shadow(0 0 6px rgba(255,255,255,0.95)) drop-shadow(0 0 14px rgba(255,180,60,0.55))",
+                }}
               />
+              <span className="text-xs font-semibold" style={{ color: "#ffffff" }}>Sarvam</span>
             </div>
             <Link
               href="/app"

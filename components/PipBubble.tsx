@@ -2,6 +2,70 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useModeLabels } from "@/hooks/useModeLabels";
+import { TRANSLATE_EXAMPLES, DICTATE_EXAMPLES } from "@/lib/examples";
+
+// Compact canvas waveform for PiP — mirrors LiveWaveform but sized for the 240px bubble
+const PIP_BARS = 24;
+const PIP_BAR_W = 3;
+const PIP_GAP = 2;
+const PIP_CW = PIP_BARS * PIP_BAR_W + (PIP_BARS - 1) * PIP_GAP; // 118px
+const PIP_CH = 30;
+
+function PipWaveform({ stream, isRecording, accentColor }: { stream: MediaStream | null; isRecording: boolean; accentColor: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = PIP_CW * dpr;
+    canvas.height = PIP_CH * dpr;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+
+    const drawFlat = () => {
+      ctx.clearRect(0, 0, PIP_CW, PIP_CH);
+      ctx.fillStyle = accentColor;
+      ctx.globalAlpha = 0.3;
+      const cy = PIP_CH / 2;
+      for (let i = 0; i < PIP_BARS; i++) ctx.fillRect(i * (PIP_BAR_W + PIP_GAP), cy - 1, PIP_BAR_W, 2);
+      ctx.globalAlpha = 1;
+    };
+
+    if (!stream || !isRecording) { drawFlat(); return; }
+
+    let audioCtx: AudioContext;
+    try { audioCtx = new AudioContext(); } catch { drawFlat(); return; }
+
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+    analyser.smoothingTimeConstant = 0.7;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const draw = () => {
+      rafRef.current = requestAnimationFrame(draw);
+      analyser.getByteFrequencyData(data);
+      ctx.clearRect(0, 0, PIP_CW, PIP_CH);
+      ctx.fillStyle = "#f87171";
+      for (let i = 0; i < PIP_BARS; i++) {
+        const bin = Math.floor((i / PIP_BARS) * Math.min(data.length, 20));
+        const raw = data[bin] / 255;
+        const above = raw < 0.15 ? 0 : (raw - 0.15) / 0.85;
+        const v = Math.min(1, above * 1.6);
+        const bh = Math.max(2, v * PIP_CH);
+        ctx.fillRect(i * (PIP_BAR_W + PIP_GAP), (PIP_CH - bh) / 2, PIP_BAR_W, bh);
+      }
+    };
+    draw();
+
+    return () => { cancelAnimationFrame(rafRef.current); audioCtx.close(); };
+  }, [stream, isRecording, accentColor]);
+
+  return <canvas ref={canvasRef} style={{ width: PIP_CW, height: PIP_CH, display: "block" }} />;
+}
 
 type Mode = "transcribe" | "translate";
 type RecState = "idle" | "recording" | "processing" | "result" | "error";
@@ -80,7 +144,13 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
   const [duration, setDuration] = useState(0);
   const [copied, setCopied] = useState(false);
   const [activated, setActivated] = useState(false);
-  const modeLabels = useModeLabels();
+  const [processingMs, setProcessingMs] = useState<number | null>(null);
+  const [exampleIdx, setExampleIdx] = useState(0);
+  const [exampleVisible, setExampleVisible] = useState(true);
+  const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
+
+  const activeExamples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
+  const modeLabels = useModeLabels(activeExamples[exampleIdx]?.labelIdx ?? 0);
 
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -93,6 +163,25 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
       mediaRef.current?.stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  // Reset example on mode change
+  useEffect(() => {
+    setExampleIdx(0);
+    setExampleVisible(true);
+  }, [mode]);
+
+  // Cycle examples every 5 s
+  useEffect(() => {
+    const examples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
+    const id = setInterval(() => {
+      setExampleVisible(false);
+      setTimeout(() => {
+        setExampleIdx(i => (i + 1) % examples.length);
+        setExampleVisible(true);
+      }, 500);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [mode]);
 
   const setModeAndSave = (m: Mode) => {
     setMode(m);
@@ -118,12 +207,23 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
     });
   }, []);
 
+  const addToHistory = useCallback((text: string, m: Mode, ms?: number) => {
+    if (!text.trim()) return;
+    try {
+      const raw = localStorage.getItem("bolkar-history");
+      const items = raw ? JSON.parse(raw) : [];
+      const entry = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, transcript: text, mode: m, timestamp: Date.now(), processingMs: ms };
+      localStorage.setItem("bolkar-history", JSON.stringify([entry, ...items].slice(0, 10)));
+    } catch {}
+  }, []);
+
   const startRecording = useCallback(async () => {
     setError("");
     setTranscript("");
     chunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setLiveStream(stream);
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       mediaRef.current = recorder;
@@ -131,12 +231,14 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
+        setLiveStream(null);
         if (timerRef.current) clearInterval(timerRef.current);
         const mime = (recorder.mimeType || "audio/webm").split(";")[0];
         const blob = new Blob(chunksRef.current, { type: mime });
         chunksRef.current = [];
         const ext = mime.includes("ogg") ? "ogg" : mime.includes("mp4") ? "mp4" : "webm";
         setRecState("processing");
+        const pipProcStart = Date.now();
         try {
           const fd = new FormData();
           fd.append("audio", blob, `recording.${ext}`);
@@ -144,8 +246,11 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
           const res = await fetch("/api/transcribe", { method: "POST", body: fd });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+          const ms = Date.now() - pipProcStart;
+          setProcessingMs(ms);
           setTranscript(data.transcript);
           setRecState("result");
+          addToHistory(data.transcript, mode, ms);
           copyText(data.transcript);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Transcription failed");
@@ -159,16 +264,17 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
       startRef.current = Date.now();
       timerRef.current = setInterval(() => setDuration(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
     } catch (err) {
+      setLiveStream(null);
       setError(err instanceof DOMException && err.name === "NotAllowedError" ? "Mic access denied" : "Could not start recording");
       setRecState("error");
     }
-  }, [mode, copyText]);
+  }, [mode, copyText, addToHistory]);
 
   const stopRecording = useCallback(() => {
     if (mediaRef.current && recState === "recording") mediaRef.current.stop();
   }, [recState]);
 
-  const reset = () => { setTranscript(""); setError(""); setDuration(0); setRecState("idle"); };
+  const reset = () => { setTranscript(""); setError(""); setDuration(0); setProcessingMs(null); setRecState("idle"); };
 
   const handleMic = () => {
     if (recState === "idle" || recState === "error" || recState === "result") startRecording();
@@ -241,35 +347,60 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
             )}
           </button>
 
+          {/* Waveform — shown when idle or recording */}
+          {(recState === "idle" || recState === "recording") && (
+            <PipWaveform
+              stream={liveStream}
+              isRecording={recState === "recording"}
+              accentColor={mode === "translate" ? "#a78bfa" : "#60a5fa"}
+            />
+          )}
+
+          {/* Timer — shown while recording */}
+          {recState === "recording" && (
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171", fontVariantNumeric: "tabular-nums" as const }}>
+              {fmtDuration(duration)}
+            </span>
+          )}
+
           {/* Status */}
           <p style={S.status}>
-            {recState === "recording" ? `● ${fmtDuration(duration)}  —  click to stop`
+            {recState === "recording" ? "click to stop"
               : recState === "processing" ? "Processing..."
               : recState === "idle" ? "Click mic to start"
               : ""}
           </p>
 
-          {/* Example strip — idle only */}
-          {recState === "idle" && (
-            <div style={S.exampleStrip}>
-              <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: "0 0 5px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>
-                {mode === "translate" ? "Convert to English" : "Keep my language"}
-              </p>
-              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", margin: "0 0 4px", fontStyle: "italic" }}>
-                &ldquo;{mode === "translate" ? "yaar report bhejo EOD tak" : "kal meeting 3 baje hai"}&rdquo;
-              </p>
-              <div style={{ display: "flex", alignItems: "center", gap: 4, margin: "0 0 4px" }}>
-                <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" }} />
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={mode === "translate" ? "#a78bfa" : "#60a5fa"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-                <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" }} />
+          {/* Example strip — idle only, revolving */}
+          {recState === "idle" && (() => {
+            const ex = activeExamples[exampleIdx];
+            const accentColor = mode === "translate" ? "#a78bfa" : "#60a5fa";
+            return (
+              <div style={S.exampleStrip}>
+                <div style={{ opacity: exampleVisible ? 1 : 0, transform: exampleVisible ? "translateY(0px)" : "translateY(5px)", transition: "opacity 0.45s ease, transform 0.45s ease" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                    <p style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", margin: 0, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" as const }}>
+                      {mode === "translate" ? "→ English" : "As spoken"}
+                    </p>
+                    <span style={{ fontSize: 9, color: accentColor, fontWeight: 600, opacity: 0.8 }}>{ex.lang}</span>
+                  </div>
+                  <p style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", margin: "0 0 4px", fontStyle: "italic" }}>
+                    &ldquo;{ex.input}&rdquo;
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, margin: "0 0 4px" }}>
+                    <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" }} />
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                    <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" }} />
+                  </div>
+                  <p style={{ fontSize: 10, color: "#f4f4f5", margin: 0, fontWeight: 500 }}>
+                    &ldquo;{ex.output}&rdquo;
+                  </p>
+                </div>
               </div>
-              <p style={{ fontSize: 10, color: "#f4f4f5", margin: 0, fontWeight: 500 }}>
-                &ldquo;{mode === "translate" ? "Please send the report by EOD." : "Kal meeting 3 baje hai."}&rdquo;
-              </p>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Error */}
           {recState === "error" && (
@@ -282,6 +413,15 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
           {/* Result */}
           {recState === "result" && transcript && (
             <div style={{ width: "100%" }}>
+              {processingMs && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, backgroundColor: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 100, padding: "2px 8px" }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="#fbbf24" stroke="none"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#fbbf24", fontVariantNumeric: "tabular-nums" }}>{(processingMs / 1000).toFixed(1)}s</span>
+                  </div>
+                  <span style={{ fontSize: 10, color: "#a1a1aa", fontWeight: 500 }}>Sarvam AI</span>
+                </div>
+              )}
               <div style={S.resultCard}>
                 <p style={S.resultText}>{transcript}</p>
               </div>

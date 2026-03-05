@@ -3,13 +3,17 @@
 import { useState, useEffect } from "react";
 
 const words = [
-  { text: "बोल", lang: "Hindi" },
-  { text: "ਬੋਲ", lang: "Punjabi" },
-  { text: "بول", lang: "Urdu" },
-  { text: "বলো", lang: "Bengali" },
-  { text: "બોલ", lang: "Gujarati" },
+  { text: "बोलो", lang: "Hindi" },
+  { text: "speak", lang: "English" },
+  { text: "ਬੋਲੋ", lang: "Punjabi" },
   { text: "பேசு", lang: "Tamil" },
-  { text: "bol", lang: "English" },
+  { text: "বলো", lang: "Bengali" },
+  { text: "మాట్లాడు", lang: "Telugu" },
+  { text: "بولو", lang: "Urdu" },
+  { text: "ಮಾತಾಡು", lang: "Kannada" },
+  { text: "બોલો", lang: "Gujarati" },
+  { text: "പറയൂ", lang: "Malayalam" },
+  { text: "बोल", lang: "Marathi" },
 ];
 
 export default function BolAnimation() {
@@ -33,8 +37,8 @@ export default function BolAnimation() {
       style={{ minWidth: "2em", textAlign: "center" }}
     >
       <span
-        className="text-blue-500"
         style={{
+          color: "#c4b5fd",
           display: "inline-block",
           transition: "opacity 0.35s ease, transform 0.35s ease",
           opacity: visible ? 1 : 0,
@@ -44,7 +48,7 @@ export default function BolAnimation() {
         {words[index].text}
       </span>
       <span
-        className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-sm font-normal tracking-widest text-zinc-600 uppercase"
+        className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-sm font-normal tracking-widest text-zinc-400 uppercase"
         style={{
           transition: "opacity 0.35s ease",
           opacity: visible ? 1 : 0,

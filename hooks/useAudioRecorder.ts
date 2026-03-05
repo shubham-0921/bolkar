@@ -7,6 +7,7 @@ export type RecorderState = "idle" | "recording" | "processing" | "result" | "er
 export interface RecorderResult {
   transcript: string;
   mode: "transcribe" | "translate";
+  processingMs: number;
 }
 
 export function useAudioRecorder() {
@@ -14,6 +15,7 @@ export function useAudioRecorder() {
   const [result, setResult] = useState<RecorderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
+  const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -38,6 +40,7 @@ export function useAudioRecorder() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setLiveStream(stream);
 
       // Prefer webm, fall back to ogg, then default
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -55,6 +58,7 @@ export function useAudioRecorder() {
 
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
+        setLiveStream(null);
         if (timerRef.current) clearInterval(timerRef.current);
 
         // Strip codec suffix — Sarvam accepts "audio/webm" not "audio/webm;codecs=opus"
@@ -70,6 +74,7 @@ export function useAudioRecorder() {
             : "webm";
 
         setState("processing");
+        const processingStart = Date.now();
         try {
           const formData = new FormData();
           formData.append("audio", audioBlob, `recording.${ext}`);
@@ -86,7 +91,7 @@ export function useAudioRecorder() {
           }
 
           const data = await res.json();
-          setResult({ transcript: data.transcript, mode });
+          setResult({ transcript: data.transcript, mode, processingMs: Date.now() - processingStart });
           setState("result");
         } catch (err) {
           setError(err instanceof Error ? err.message : "Transcription failed");
@@ -121,6 +126,7 @@ export function useAudioRecorder() {
     setResult(null);
     setError(null);
     setDuration(0);
+    setLiveStream(null);
     setState("idle");
   }, []);
 
@@ -135,6 +141,7 @@ export function useAudioRecorder() {
     result,
     error,
     duration,
+    liveStream,
     formattedDuration: formatDuration(duration),
     startRecording,
     stopRecording,

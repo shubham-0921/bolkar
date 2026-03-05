@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   description:
     "India's voice-to-text app. Speak in any of 22 Indian languages, get clean text instantly. Powered by Sarvam AI.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon.svg",
+    apple: "/icons/icon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -26,11 +30,19 @@ export const metadata: Metadata = {
     description:
       "Speak Hinglish. Write professional English. Voice-to-text for India, powered by Sarvam AI.",
     type: "website",
+    url: "https://bolkar.online",
+    siteName: "Bolkar",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bolkar — Bol. Type mat kar.",
+    description:
+      "Voice-to-text for India. Speak any Indian language, get clean text instantly.",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb",
+  themeColor: "#7c3aed",
   width: "device-width",
   initialScale: 1,
 };
