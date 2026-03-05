@@ -32,6 +32,7 @@ Bolkar is an India-first, zero-signup voice-to-text PWA. You speak — in Hindi,
 | PWA | `manifest.json` + Service Worker |
 | Analytics | Google Analytics GA4 |
 | Hosting | GCP VM + nginx |
+| Domain | `bolkar.online` — registered on GoDaddy, DNS configured to GCP VM |
 
 ### Sarvam AI endpoints used
 
