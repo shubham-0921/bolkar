@@ -1,21 +1,15 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { addToHistory, HISTORY_STORAGE_KEY } from "@/core/history";
+import type { HistoryItem, TranscriptionMode } from "@/core/types";
 
-const STORAGE_KEY = "bolkar-history";
-const MAX_ITEMS = 10;
-
-export interface HistoryItem {
-  id: string;
-  transcript: string;
-  mode: "transcribe" | "translate";
-  timestamp: number;
-  processingMs?: number;
-}
+// Re-export for consumers that already import HistoryItem from here
+export type { HistoryItem };
 
 function load(): HistoryItem[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -24,25 +18,17 @@ function load(): HistoryItem[] {
 
 function save(items: HistoryItem[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(items));
   } catch {}
 }
 
 export function useHistory() {
   const [items, setItems] = useState<HistoryItem[]>(() => load());
 
-  const addItem = useCallback((transcript: string, mode: "transcribe" | "translate", processingMs?: number) => {
-    if (!transcript.trim()) return;
-    const entry: HistoryItem = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      transcript,
-      mode,
-      timestamp: Date.now(),
-      processingMs,
-    };
+  const addItem = useCallback((transcript: string, mode: TranscriptionMode, processingMs?: number) => {
     setItems((prev) => {
-      const updated = [entry, ...prev].slice(0, MAX_ITEMS);
-      save(updated);
+      const updated = addToHistory(prev, transcript, mode, processingMs);
+      if (updated !== prev) save(updated);
       return updated;
     });
   }, []);
@@ -55,10 +41,5 @@ export function useHistory() {
   return { items, addItem, clearHistory };
 }
 
-export function timeAgo(ts: number): string {
-  const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
+// Re-export so existing imports of timeAgo from this hook still work
+export { timeAgo } from "@/core/utils/format";

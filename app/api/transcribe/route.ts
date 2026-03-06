@@ -5,7 +5,8 @@ export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
+    // Cast needed: Node 24 global FormData type conflicts with DOM FormData
+    const formData = await req.formData() as unknown as { get(k: string): File | string | null };
     const audioFile = formData.get("audio");
     const mode = formData.get("mode") as string;
 

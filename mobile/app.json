@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Bolkar",
+    "slug": "bolkar",
+    "version": "1.0.0",
+    "android": {
+      "package": "com.bolkar",
+      "permissions": [
+        "RECORD_AUDIO",
+        "SYSTEM_ALERT_WINDOW",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MICROPHONE"
+      ]
+    }
+  }
+}

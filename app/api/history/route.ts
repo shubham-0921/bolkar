@@ -1,0 +1,70 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { history } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
+// TODO: re-enable auth once dev server is stable
+// import { auth } from "@/auth";
+async function getUserId(_req: NextRequest): Promise<string | null> {
+  return null;
+}
+
+export async function GET(req: NextRequest) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const items = await db
+    .select()
+    .from(history)
+    .where(eq(history.userId, userId))
+    .orderBy(desc(history.createdAt))
+    .limit(50);
+
+  return NextResponse.json(items);
+}
+
+export async function POST(req: NextRequest) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json() as {
+    transcript: string;
+    mode: "transcribe" | "translate";
+    processingMs?: number;
+  };
+
+  if (!body.transcript?.trim() || !body.mode) {
+    return NextResponse.json({ error: "transcript and mode are required" }, { status: 400 });
+  }
+
+  const [item] = await db
+    .insert(history)
+    .values({
+      userId,
+      transcript: body.transcript,
+      mode: body.mode,
+      processingMs: body.processingMs ?? null,
+    })
+    .returning();
+
+  return NextResponse.json(item, { status: 201 });
+}
+
+export async function DELETE(req: NextRequest) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+
+  if (id) {
+    // Delete a single item — verify ownership first
+    await db
+      .delete(history)
+      .where(eq(history.id, id) && eq(history.userId, userId) as any);
+  } else {
+    // Clear all history for the user
+    await db.delete(history).where(eq(history.userId, userId));
+  }
+
+  return new NextResponse(null, { status: 204 });
+}

@@ -7,13 +7,16 @@ import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import dynamic from "next/dynamic";
 import PipBubble from "@/components/PipBubble";
 import { useModeLabels } from "@/hooks/useModeLabels";
-import { TRANSLATE_EXAMPLES, DICTATE_EXAMPLES } from "@/lib/examples";
+import { TRANSLATE_EXAMPLES, DICTATE_EXAMPLES } from "@/core/data/examples";
 
 const LiveWaveform = dynamic(() => import("@/components/LiveWaveform"), {
   ssr: false,
   loading: () => <div style={{ width: 198, height: 52 }} />,
 });
 import { useHistory, timeAgo } from "@/hooks/useHistory";
+import { useHotWords } from "@/hooks/useHotWords";
+import { usePostProcess } from "@/hooks/usePostProcess";
+import HotWordsPanel from "@/components/HotWordsPanel";
 import BolkarLogo from "@/components/BolkarLogo";
 
 type Mode = "transcribe" | "translate";
@@ -94,9 +97,14 @@ export default function AppPage() {
   const pipRootRef = useRef<ReturnType<typeof ReactDOM.createRoot> | null>(null);
   const pipWindowRef = useRef<Window | null>(null);
 
-  const { state, result, error, liveStream, formattedDuration, startRecording, stopRecording, reset } =
+  const [showTools, setShowTools] = useState(false);
+  const [toolsTab, setToolsTab] = useState<"hotwords" | "postprocess">("hotwords");
+
+  const { state, result, partialTranscript, liveTranscript, error, liveStream, formattedDuration, startRecording, stopRecording, reset } =
     useAudioRecorder();
   const { items: historyItems, addItem: addToHistory, clearHistory } = useHistory();
+  const { hotWords, addHotWord, removeHotWord } = useHotWords();
+  const { options: ppOptions, setOption: setPpOption, applyToTranscript } = usePostProcess();
 
   useEffect(() => {
     const saved = localStorage.getItem("bolkar-mode") as Mode | null;
@@ -136,15 +144,16 @@ export default function AppPage() {
 
   useEffect(() => {
     if (state === "result" && result?.transcript) {
-      addToHistory(result.transcript, result.mode, result.processingMs);
-      navigator.clipboard.writeText(result.transcript).then(() => {
+      const processed = applyToTranscript(result.transcript, hotWords);
+      addToHistory(processed, result.mode, result.processingMs);
+      navigator.clipboard.writeText(processed).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 3000);
       }).catch(() => {});
       dismissTimerRef.current = setTimeout(() => reset(), 10000);
     }
     return () => { if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current); };
-  }, [state, result, reset]);
+  }, [state, result, reset, applyToTranscript, hotWords]);
 
   const handleMicClick = () => {
     if (state === "idle" || state === "error" || state === "result") {
@@ -163,13 +172,14 @@ export default function AppPage() {
   };
 
   const handleCopy = useCallback(() => {
-    const text = editText !== null ? editText : result?.transcript ?? "";
+    const processed = result ? applyToTranscript(result.transcript, hotWords) : "";
+    const text = editText !== null ? editText : processed;
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  }, [editText, result]);
+  }, [editText, result, applyToTranscript, hotWords]);
 
   const launchPip = useCallback(async () => {
     // Close any existing PiP window before opening a new one
@@ -232,6 +242,7 @@ export default function AppPage() {
   const isProcessing = state === "processing";
   const showResult = state === "result";
   const showError = state === "error";
+  const displayTranscript = result ? applyToTranscript(result.transcript, hotWords) : "";
   const cfg = modeConfig[mode];
   const activeExamples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
   const modeLabels = useModeLabels(activeExamples[exampleIdx]?.labelIdx ?? 0);
@@ -253,6 +264,27 @@ export default function AppPage() {
             <span>bol<span className="transition-colors duration-300" style={{ color: cfg.accent }}>kar</span></span>
           </Link>
           <div className="flex items-center gap-3">
+            {/* Tools button */}
+            <button
+              onClick={() => setShowTools(true)}
+              title="Hot words & post-processing"
+              className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all"
+              style={{
+                backgroundColor: (hotWords.length > 0 || ppOptions.removeFillerWords) ? "rgba(255,255,255,0.06)" : "transparent",
+                border: `1px solid ${(hotWords.length > 0 || ppOptions.removeFillerWords) ? "rgba(255,255,255,0.1)" : "transparent"}`,
+                color: "#a1a1aa",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+              </svg>
+              Tools
+              {hotWords.length > 0 && (
+                <span className="rounded-full px-1.5 py-0.5 text-xs font-bold" style={{ backgroundColor: cfg.activePillBg, color: "#fff", minWidth: 18, textAlign: "center" }}>
+                  {hotWords.length}
+                </span>
+              )}
+            </button>
             {/* History button */}
             <button
               onClick={() => setShowHistory(true)}
@@ -367,8 +399,8 @@ export default function AppPage() {
             </div>
           </div>
 
-          {/* Mode example card — revolving examples */}
-          {(() => {
+          {/* ── Example card — hidden once something is happening ── */}
+          {!showResult && !isProcessing && !showError && (() => {
             const examples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
             const ex = examples[exampleIdx];
             return (
@@ -388,109 +420,191 @@ export default function AppPage() {
                   <div className="p-4" style={{ borderRight: "1px solid rgba(255,255,255,0.1)", minHeight: "9rem" }}>
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#71717a" }}>You say</p>
                     <p className="text-sm italic text-zinc-300 leading-relaxed">&ldquo;{ex.input}&rdquo;</p>
-                    <span
-                      className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                      style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#a1a1aa" }}
-                    >
-                      {ex.lang}
-                    </span>
+                    <span className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#a1a1aa" }}>{ex.lang}</span>
                   </div>
                   <div className="p-4" style={{ minHeight: "9rem" }}>
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: cfg.accent }}>Bolkar outputs</p>
                     <p className="text-sm font-medium text-white leading-relaxed">&ldquo;{ex.output}&rdquo;</p>
-                    <span
-                      className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                      style={{ backgroundColor: `${cfg.activePillBg}30`, color: cfg.accent, border: `1px solid ${cfg.activePillBg}50` }}
-                    >
-                      {ex.outputLang}
-                    </span>
+                    <span className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${cfg.activePillBg}30`, color: cfg.accent, border: `1px solid ${cfg.activePillBg}50` }}>{ex.outputLang}</span>
                   </div>
                 </div>
-                {/* Dot indicators */}
                 <div className="flex justify-center gap-1.5 pb-3 pt-1">
                   {examples.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { setExampleVisible(false); setTimeout(() => { setExampleIdx(i); setExampleVisible(true); }, 300); }}
-                      className="rounded-full transition-all duration-300"
-                      style={{
-                        width: i === exampleIdx ? 16 : 6,
-                        height: 6,
-                        backgroundColor: i === exampleIdx ? cfg.accent : "rgba(255,255,255,0.2)",
-                      }}
-                    />
+                    <button key={i} onClick={() => { setExampleVisible(false); setTimeout(() => { setExampleIdx(i); setExampleVisible(true); }, 300); }} className="rounded-full transition-all duration-300" style={{ width: i === exampleIdx ? 16 : 6, height: 6, backgroundColor: i === exampleIdx ? cfg.accent : "rgba(255,255,255,0.2)" }} />
                   ))}
                 </div>
               </div>
             );
           })()}
 
-          {/* Mic area */}
-          <div className="flex flex-col items-center">
-            <div className="relative mb-8 flex items-center justify-center">
-              {isRecording && (
-                <>
-                  <div className="animate-pulse-ring absolute h-36 w-36 rounded-full bg-red-500/15" />
-                  <div className="animate-pulse-ring absolute h-36 w-36 rounded-full bg-red-500/15" style={{ animationDelay: "0.7s" }} />
-                </>
-              )}
-              {!isRecording && !isProcessing && (
-                <div
-                  className="absolute h-36 w-36 rounded-full transition-all duration-500"
-                  style={{ background: `radial-gradient(circle, ${cfg.micRingColor} 0%, transparent 70%)` }}
-                />
-              )}
+          {/* ── Streaming transcript — main focus during processing ── */}
+          {isProcessing && (
+            <div className="mb-8 animate-fade-in-up overflow-hidden rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin shrink-0">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+                <span className="text-sm font-medium text-zinc-400">Transcribing…</span>
+              </div>
+              <div className="min-h-[5rem] p-6">
+                {partialTranscript ? (
+                  <p className="text-base leading-relaxed text-zinc-100">
+                    {partialTranscript}
+                    <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-zinc-400 align-middle" />
+                  </p>
+                ) : (
+                  <div className="flex gap-1.5 items-center">
+                    <span className="h-2 w-2 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "0ms" }} />
+                    <span className="h-2 w-2 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "200ms" }} />
+                    <span className="h-2 w-2 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "400ms" }} />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Result card — primary content when done ── */}
+          {showResult && result && (
+            <div className="mb-6 animate-fade-in-up overflow-hidden rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="text-sm font-medium text-zinc-400">
+                    {result.mode === "translate" ? "Converted to English" : "Kept in your language"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <SpeedBadge ms={result.processingMs} />
+                  <span className="text-xs font-medium" style={{ color: "#a1a1aa" }}>Sarvam AI</span>
+                </div>
+              </div>
+              <div className="p-6">
+                {editText !== null ? (
+                  <textarea
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    className="w-full resize-none rounded-xl p-4 text-base leading-relaxed text-zinc-100 outline-none"
+                    style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                    rows={4}
+                    autoFocus
+                  />
+                ) : (
+                  <p className="text-base leading-relaxed text-zinc-100">{displayTranscript}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-3 px-6 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+                <button onClick={handleCopy} className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold transition-all active:scale-95" style={{ backgroundColor: cfg.activePillBg, color: "#fff" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {copied ? <polyline points="20 6 9 17 4 12" /> : <><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></>}
+                  </svg>
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+                {editText === null ? (
+                  <button onClick={() => setEditText(displayTranscript)} className="flex items-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-200" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+                    Edit
+                  </button>
+                ) : (
+                  <button onClick={handleCopy} className="rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/5" style={{ color: cfg.accent, border: "1px solid rgba(255,255,255,0.1)" }}>Copy edited</button>
+                )}
+                <button onClick={handleDismiss} className="rounded-xl px-4 py-3 text-sm text-zinc-500 transition-colors hover:text-zinc-300" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>Dismiss</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Error ── */}
+          {showError && error && (
+            <div className="mb-6 animate-fade-in-up rounded-2xl p-6" style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              <div className="flex items-start gap-4">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-red-400">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-base font-medium text-red-300">{error}</p>
+                  <button onClick={reset} className="mt-2 text-sm font-medium text-red-400 hover:text-red-200">Try again →</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Mic area ── */}
+          <div className={`flex flex-col items-center ${showResult || showError ? "mb-2" : ""}`}>
+            {/* Full mic — idle or recording */}
+            {!showResult && !showError && (
+              <div className="relative mb-8 flex items-center justify-center">
+                {isRecording && (
+                  <>
+                    <div className="animate-pulse-ring absolute h-36 w-36 rounded-full bg-red-500/15" />
+                    <div className="animate-pulse-ring absolute h-36 w-36 rounded-full bg-red-500/15" style={{ animationDelay: "0.7s" }} />
+                  </>
+                )}
+                {!isRecording && !isProcessing && (
+                  <div className="absolute h-36 w-36 rounded-full transition-all duration-500" style={{ background: `radial-gradient(circle, ${cfg.micRingColor} 0%, transparent 70%)` }} />
+                )}
+                <button
+                  onClick={handleMicClick}
+                  disabled={isProcessing}
+                  aria-label={isRecording ? "Stop recording" : "Start recording"}
+                  className="relative z-10 flex h-28 w-28 items-center justify-center rounded-full shadow-2xl transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ backgroundColor: isRecording ? "#ef4444" : isProcessing ? "#27272a" : cfg.micIdle }}
+                >
+                  {isProcessing ? (
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  ) : isRecording ? (
+                    <div className="h-9 w-9 rounded-lg bg-white" />
+                  ) : (
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" x2="12" y1="19" y2="22" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Compact re-record button — when result or error */}
+            {(showResult || showError) && (
               <button
                 onClick={handleMicClick}
-                disabled={isProcessing}
-                aria-label={isRecording ? "Stop recording" : "Start recording"}
-                className="relative z-10 flex h-28 w-28 items-center justify-center rounded-full shadow-2xl transition-all duration-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{
-                  backgroundColor: isRecording
-                    ? "#ef4444"
-                    : isProcessing
-                    ? "#27272a"
-                    : cfg.micIdle,
-                }}
+                className="flex items-center gap-2.5 rounded-full px-6 py-3 text-sm font-semibold transition-all active:scale-95"
+                style={{ backgroundColor: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "#a1a1aa" }}
               >
-                {isProcessing ? (
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
-                ) : isRecording ? (
-                  <div className="h-9 w-9 rounded-lg bg-white" />
-                ) : (
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" x2="12" y1="19" y2="22" />
-                  </svg>
-                )}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+                New recording
               </button>
-            </div>
+            )}
 
             {!isProcessing && !showResult && !showError && (
-              <div className="mb-5 flex flex-col items-center gap-3">
-                <LiveWaveform
-                  stream={liveStream}
-                  isRecording={isRecording}
-                  idleColor={cfg.accent}
-                />
-                {isRecording && (
-                  <span className="text-sm font-semibold tabular-nums text-red-400">{formattedDuration}</span>
+              <div className="mb-5 flex flex-col items-center gap-3 w-full">
+                <LiveWaveform stream={liveStream} isRecording={isRecording} idleColor={cfg.accent} />
+                {isRecording && <span className="text-sm font-semibold tabular-nums text-red-400">{formattedDuration}</span>}
+                {isRecording && liveTranscript && (
+                  <div
+                    className="w-full rounded-2xl px-5 py-4 animate-fade-in-up"
+                    style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#71717a" }}>Live preview</p>
+                    <p className="text-sm leading-relaxed text-zinc-300">
+                      {liveTranscript}
+                      <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-zinc-500 align-middle" />
+                    </p>
+                  </div>
                 )}
               </div>
             )}
 
-            <p className="text-base font-medium text-zinc-400">
-              {isRecording
-                ? "Recording — click to stop"
-                : isProcessing
-                ? "Processing your speech…"
-                : showResult || showError
-                ? ""
-                : "Click the mic to start"}
-            </p>
+            {!showResult && !showError && (
+              <p className="text-base font-medium text-zinc-400">
+                {isRecording ? "Recording — click to stop" : isProcessing ? "" : "Click the mic to start"}
+              </p>
+            )}
           </div>
 
           {/* Use Bolkar Anywhere — shown when idle and at least one option is supported */}
@@ -572,113 +686,6 @@ export default function AppPage() {
             </div>
           )}
 
-          {/* Result card */}
-          {showResult && result && (
-            <div
-              className="mt-10 animate-fade-in-up overflow-hidden rounded-2xl"
-              style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
-            >
-              <div
-                className="flex items-center justify-between px-6 py-4"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-sm font-medium text-zinc-400">
-                    {result.mode === "translate" ? "Converted to English" : "Kept in your language"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <SpeedBadge ms={result.processingMs} />
-                  <span className="text-xs font-medium" style={{ color: "#a1a1aa" }}>Sarvam AI</span>
-                </div>
-              </div>
-              <div className="p-6">
-                {editText !== null ? (
-                  <textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    className="w-full resize-none rounded-xl p-4 text-base leading-relaxed text-zinc-100 outline-none"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                    }}
-                    rows={4}
-                    autoFocus
-                  />
-                ) : (
-                  <p className="text-base leading-relaxed text-zinc-100">{result.transcript}</p>
-                )}
-              </div>
-              <div
-                className="flex items-center gap-3 px-6 py-4"
-                style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
-              >
-                {/* Copy — primary action */}
-                <button
-                  onClick={handleCopy}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold transition-all active:scale-95"
-                  style={{ backgroundColor: cfg.activePillBg, color: "#fff" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    {copied
-                      ? <polyline points="20 6 9 17 4 12" />
-                      : <><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></>
-                    }
-                  </svg>
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-                {/* Edit */}
-                {editText === null ? (
-                  <button
-                    onClick={() => setEditText(result.transcript)}
-                    className="flex items-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-200"
-                    style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                    </svg>
-                    Edit
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleCopy}
-                    className="rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/5"
-                    style={{ color: cfg.accent, border: "1px solid rgba(255,255,255,0.1)" }}
-                  >
-                    Copy edited
-                  </button>
-                )}
-                {/* Dismiss */}
-                <button
-                  onClick={handleDismiss}
-                  className="rounded-xl px-4 py-3 text-sm text-zinc-500 transition-colors hover:text-zinc-300"
-                  style={{ border: "1px solid rgba(255,255,255,0.08)" }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Error */}
-          {showError && error && (
-            <div
-              className="mt-8 animate-fade-in-up rounded-2xl p-6"
-              style={{ backgroundColor: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}
-            >
-              <div className="flex items-start gap-4">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-red-400">
-                  <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />
-                </svg>
-                <div className="flex-1">
-                  <p className="text-base font-medium text-red-300">{error}</p>
-                  <button onClick={reset} className="mt-2 text-sm font-medium text-red-400 hover:text-red-200">Try again →</button>
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
       </main>
 
@@ -694,6 +701,95 @@ export default function AppPage() {
           <span className="text-sm font-medium text-zinc-200">Copied to clipboard</span>
         </div>
       )}
+
+      {/* Tools panel backdrop */}
+      {showTools && (
+        <div
+          className="fixed inset-0 z-40"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+          onClick={() => setShowTools(false)}
+        />
+      )}
+
+      {/* Tools panel */}
+      <div
+        className="fixed left-0 top-0 z-50 flex h-full w-full flex-col sm:w-96"
+        style={{
+          backgroundColor: "#0e0e12",
+          borderRight: "1px solid rgba(255,255,255,0.1)",
+          transform: showTools ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+        }}
+      >
+        <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <h2 className="text-base font-semibold text-white">Tools</h2>
+          <button onClick={() => setShowTools(false)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 px-4 pt-4">
+          {(["hotwords", "postprocess"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setToolsTab(tab)}
+              className="flex-1 rounded-xl py-2 text-sm font-semibold transition-all"
+              style={{
+                backgroundColor: toolsTab === tab ? cfg.activePillBg : "transparent",
+                color: toolsTab === tab ? "#fff" : "#71717a",
+              }}
+            >
+              {tab === "hotwords" ? "Hot Words" : "Post-Process"}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {toolsTab === "hotwords" ? (
+            <div className="space-y-3">
+              <p className="text-xs leading-relaxed" style={{ color: "#71717a" }}>
+                Spoken trigger phrases auto-replaced in every transcript. Say the trigger → get the replacement.
+              </p>
+              <HotWordsPanel hotWords={hotWords} onAdd={addHotWord} onRemove={removeHotWord} />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-xs leading-relaxed" style={{ color: "#71717a" }}>
+                Applied automatically to every transcript result.
+              </p>
+              {([
+                { key: "capitalizeSentences", label: "Capitalize sentences", desc: "Auto-capitalize the first word of each sentence" },
+                { key: "removeFillerWords", label: "Remove filler words", desc: 'Strips "um", "uh", "like", "basically", etc.' },
+                { key: "applyHotWords", label: "Apply hot words", desc: "Substitute trigger phrases with their replacements" },
+              ] as const).map(({ key, label, desc }) => (
+                <div
+                  key={key}
+                  className="flex items-start justify-between gap-4 rounded-xl p-4"
+                  style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-white">{label}</p>
+                    <p className="mt-0.5 text-xs" style={{ color: "#71717a" }}>{desc}</p>
+                  </div>
+                  <button
+                    onClick={() => setPpOption(key, !ppOptions[key])}
+                    className="mt-0.5 shrink-0 h-6 w-11 rounded-full transition-colors duration-200"
+                    style={{ backgroundColor: ppOptions[key] ? cfg.activePillBg : "rgba(255,255,255,0.1)" }}
+                    role="switch"
+                    aria-checked={ppOptions[key]}
+                  >
+                    <span
+                      className="block h-5 w-5 rounded-full bg-white shadow transition-transform duration-200"
+                      style={{ transform: ppOptions[key] ? "translateX(22px)" : "translateX(2px)" }}
+                    />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* History panel backdrop */}
       {showHistory && (

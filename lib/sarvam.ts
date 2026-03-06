@@ -1,9 +1,10 @@
-const SARVAM_TRANSCRIBE_URL = "https://api.sarvam.ai/speech-to-text";
-const SARVAM_TRANSLATE_URL = "https://api.sarvam.ai/speech-to-text-translate";
+// Server-side wrapper: reads SARVAM_API_KEY from process.env and delegates to core.
+import { sarvamTranscribe } from "@/core/api/sarvam";
+import type { TranscriptionMode } from "@/core/types";
 
 export async function transcribeAudio(
   audioBlob: Blob,
-  mode: "transcribe" | "translate"
+  mode: TranscriptionMode
 ): Promise<string> {
   const apiKey = process.env.SARVAM_API_KEY;
   if (!apiKey) {
@@ -12,42 +13,8 @@ export async function transcribeAudio(
     );
   }
 
-  const url =
-    mode === "translate" ? SARVAM_TRANSLATE_URL : SARVAM_TRANSCRIBE_URL;
-
-  const formData = new FormData();
-  formData.append("file", audioBlob, "recording.webm");
-  formData.append("model", "saaras:v3");
-  formData.append("language_code", "unknown"); // explicit auto-detect for all 22 languages
-
-  console.log(`[sarvam] Calling ${url}, blob size: ${audioBlob.size} bytes`);
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "api-subscription-key": apiKey,
-    },
-    body: formData,
-  });
-
-  const responseText = await response.text();
-  console.log(`[sarvam] Status: ${response.status}, Body: ${responseText}`);
-
-  if (!response.ok) {
-    let message = `Sarvam API error ${response.status}`;
-    try {
-      const errData = JSON.parse(responseText);
-      const detail =
-        errData.detail ?? errData.message ?? errData.error ?? errData;
-      message =
-        typeof detail === "string" ? detail : JSON.stringify(detail);
-    } catch {
-      message = responseText || message;
-    }
-    throw new Error(message);
-  }
-
-  const data = JSON.parse(responseText);
-  const text: string = data.transcript ?? "";
-  return text;
+  console.log(`[sarvam] mode=${mode}, blob size: ${audioBlob.size} bytes`);
+  const transcript = await sarvamTranscribe({ apiKey, audioBlob, mode });
+  console.log(`[sarvam] transcript: ${transcript.slice(0, 80)}...`);
+  return transcript;
 }
