@@ -28,6 +28,8 @@ class FloatingService : Service() {
         const val EXTRA_API_KEY = "api_key"
         const val EXTRA_MODE = "mode"
         const val EXTRA_BACKEND_URL = "backend_url"
+        const val EXTRA_DEVICE_ID = "device_id"
+        private const val BAR_COUNT = 5
     }
 
     private lateinit var windowManager: WindowManager
@@ -40,16 +42,39 @@ class FloatingService : Service() {
     private var apiKey = ""
     private var mode = "translate"
     private var backendUrl = ""
+    private var deviceId = ""
 
-    // UI state
     private var isRecording = false
     private var isProcessing = false
 
-    // Views (set in createOverlay)
     private lateinit var micButton: View
     private lateinit var statusText: TextView
     private lateinit var resultCard: View
     private lateinit var resultText: TextView
+    private lateinit var waveformContainer: LinearLayout
+    private val waveformBars = mutableListOf<View>()
+
+    // Polls amplitude every 80ms and animates bars
+    private val amplitudeRunnable = object : Runnable {
+        override fun run() {
+            if (!isRecording) return
+            val rawAmp = (mediaRecorder?.maxAmplitude ?: 0) / 6000f
+            val amp = Math.sqrt(rawAmp.toDouble().coerceIn(0.0, 1.0)).toFloat()
+            waveformBars.forEachIndexed { i, bar ->
+                val phase = Math.sin((System.currentTimeMillis() / 200.0) + i * 0.8).toFloat()
+                val jitter = 0.6f + (phase + 1f) / 5f  // 0.6..1.0
+                val minH = 4.dp
+                val maxH = 52.dp
+                val targetH = if (amp > 0.02f)
+                    (minH + (maxH - minH) * amp * jitter).toInt()
+                else minH
+                val lp = bar.layoutParams
+                lp.height = targetH
+                bar.layoutParams = lp
+            }
+            handler.postDelayed(this, 80)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -65,11 +90,13 @@ class FloatingService : Service() {
         apiKey = intent?.getStringExtra(EXTRA_API_KEY) ?: ""
         mode = intent?.getStringExtra(EXTRA_MODE) ?: "translate"
         backendUrl = intent?.getStringExtra(EXTRA_BACKEND_URL) ?: ""
+        deviceId = intent?.getStringExtra(EXTRA_DEVICE_ID) ?: ""
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        handler.removeCallbacks(amplitudeRunnable)
         scope.cancel()
         mediaRecorder?.release()
         rootView?.let { windowManager.removeView(it) }
@@ -80,19 +107,40 @@ class FloatingService : Service() {
     private fun createOverlay() {
         val ctx = this
 
-        // Root container (draggable)
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        // Mic bubble button
+        // Mic bubble — click handled in makeDraggable via ACTION_UP
         val bubble = buildBubble(ctx)
         micButton = bubble
-        bubble.setOnClickListener { handleMicTap() }
         container.addView(bubble, 72.dp, 72.dp)
 
-        // Status label below bubble
+        // Waveform bars (hidden until recording)
+        val wf = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(8.dp, 6.dp, 8.dp, 0)
+            visibility = View.GONE
+        }
+        waveformContainer = wf
+        repeat(BAR_COUNT) { i ->
+            val bar = View(ctx).apply {
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor("#7c3aed"))
+                    cornerRadius = 3.dp.toFloat()
+                }
+            }
+            val lp = LinearLayout.LayoutParams(6.dp, 5.dp).apply {
+                marginStart = if (i == 0) 0 else 5.dp
+            }
+            wf.addView(bar, lp)
+            waveformBars.add(bar)
+        }
+        container.addView(wf, ViewGroup.LayoutParams.WRAP_CONTENT, 44.dp)
+
+        // Status label
         val status = TextView(ctx).apply {
             textSize = 11f
             setTextColor(Color.parseColor("#a1a1aa"))
@@ -173,9 +221,7 @@ class FloatingService : Service() {
         }
         btnRow.addView(copyBtn, 0, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT).apply { weight = 1f })
 
-        val dismissBtn = buildSmallButton(ctx, "Dismiss", "#3f3f46") {
-            hideResult()
-        }
+        val dismissBtn = buildSmallButton(ctx, "Dismiss", "#3f3f46") { hideResult() }
         btnRow.addView(dismissBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT).apply { weight = 1f })
 
         card.addView(btnRow)
@@ -198,24 +244,41 @@ class FloatingService : Service() {
         return btn
     }
 
+    // Fixed drag: return true on ACTION_DOWN so MOVE events are delivered.
+    // Distinguish tap (small movement) from drag (large movement) in ACTION_UP.
     private fun makeDraggable(view: View, params: WindowManager.LayoutParams) {
-        var startX = 0; var startY = 0; var initialX = 0; var initialY = 0
+        var startX = 0
+        var startY = 0
+        var initialX = 0
+        var initialY = 0
+        var isDragging = false
+
         view.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    startX = event.rawX.toInt(); startY = event.rawY.toInt()
-                    initialX = params.x; initialY = params.y
-                    false // allow click to pass through
+                    startX = event.rawX.toInt()
+                    startY = event.rawY.toInt()
+                    initialX = params.x
+                    initialY = params.y
+                    isDragging = false
+                    true // must return true to receive subsequent MOVE/UP events
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX.toInt() - startX
                     val dy = event.rawY.toInt() - startY
-                    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    if (!isDragging && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                        isDragging = true
+                    }
+                    if (isDragging) {
                         params.x = initialX - dx
                         params.y = initialY + dy
                         windowManager.updateViewLayout(view, params)
-                        true
-                    } else false
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!isDragging) handleMicTap()
+                    true
                 }
                 else -> false
             }
@@ -247,19 +310,23 @@ class FloatingService : Service() {
         }
 
         isRecording = true
-        setBubbleColor("#ef4444") // recording red
+        setBubbleColor("#ef4444")
+        waveformContainer.visibility = View.VISIBLE
+        handler.post(amplitudeRunnable)
         showStatus("Recording…")
         updateNotification("Recording…")
     }
 
     private fun stopRecording() {
-        try {
-            mediaRecorder?.stop()
-        } catch (_: Exception) {}
+        try { mediaRecorder?.stop() } catch (_: Exception) {}
         mediaRecorder?.release()
         mediaRecorder = null
         isRecording = false
         isProcessing = true
+
+        handler.removeCallbacks(amplitudeRunnable)
+        waveformContainer.visibility = View.GONE
+
         setBubbleColor("#27272a")
         showStatus("Processing…")
         updateNotification("Processing…")
@@ -267,11 +334,7 @@ class FloatingService : Service() {
         recordingFile?.let { file ->
             scope.launch {
                 try {
-                    val transcript = if (backendUrl.isNotBlank()) {
-                        sendToBackend(file)
-                    } else {
-                        sendToSarvam(file)
-                    }
+                    val transcript = if (backendUrl.isNotBlank()) sendToBackend(file) else sendToSarvam(file)
                     handler.post { showResult(transcript) }
                 } catch (e: Exception) {
                     handler.post { showStatus("Error: ${e.message?.take(40)}") }
@@ -293,13 +356,13 @@ class FloatingService : Service() {
             "https://api.sarvam.ai/speech-to-text-translate"
         else
             "https://api.sarvam.ai/speech-to-text"
-
         return multipartPost(endpoint, file, mapOf("api-subscription-key" to apiKey))
     }
 
     private fun sendToBackend(file: File): String {
         val endpoint = backendUrl.trimEnd('/') + "/api/transcribe"
-        return multipartPost(endpoint, file, emptyMap(), extraFields = mapOf("mode" to mode))
+        val headers = if (deviceId.isNotBlank()) mapOf("x-device-id" to deviceId) else emptyMap()
+        return multipartPost(endpoint, file, headers, extraFields = mapOf("mode" to mode))
     }
 
     private fun multipartPost(
@@ -321,7 +384,6 @@ class FloatingService : Service() {
         conn.outputStream.use { out ->
             val writer = out.bufferedWriter(Charsets.UTF_8)
 
-            // Extra text fields
             val fields = if (extraFields.isEmpty())
                 mapOf("model" to "saaras:v3", "language_code" to "unknown")
             else extraFields + mapOf("model" to "saaras:v3", "language_code" to "unknown")
@@ -333,7 +395,6 @@ class FloatingService : Service() {
                 writer.flush()
             }
 
-            // Audio file part
             val fieldName = if (backendUrl.isNotBlank()) "audio" else "file"
             writer.write("--$boundary\r\n")
             writer.write("Content-Disposition: form-data; name=\"$fieldName\"; filename=\"recording.m4a\"\r\n")
@@ -352,7 +413,6 @@ class FloatingService : Service() {
 
         if (responseCode !in 200..299) throw Exception("API error $responseCode: ${body.take(200)}")
 
-        // Parse JSON — extract "transcript"
         val match = Regex("\"transcript\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(body)
         return match?.groupValues?.getOrNull(1)?.replace("\\n", "\n")?.replace("\\\"", "\"") ?: ""
     }
@@ -371,9 +431,7 @@ class FloatingService : Service() {
         showStatus("")
     }
 
-    private fun showStatus(text: String) {
-        statusText.text = text
-    }
+    private fun showStatus(text: String) { statusText.text = text }
 
     private fun setBubbleColor(hex: String) {
         (micButton.background as? GradientDrawable)?.setColor(Color.parseColor(hex))
@@ -384,21 +442,15 @@ class FloatingService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                NOTIF_CHANNEL_ID,
-                "Bolkar Floating Mic",
-                NotificationManager.IMPORTANCE_LOW
+                NOTIF_CHANNEL_ID, "Bolkar Floating Mic", NotificationManager.IMPORTANCE_LOW
             ).apply { description = "Persistent notification for floating mic" }
-            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(channel)
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(text: String): Notification {
         val intent = packageManager.getLaunchIntentForPackage(packageName)
-        val pi = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
             .setContentTitle("Bolkar")
             .setContentText(text)

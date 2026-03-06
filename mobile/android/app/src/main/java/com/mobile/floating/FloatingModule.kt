@@ -14,10 +14,9 @@ class FloatingModule(reactContext: ReactApplicationContext) :
     override fun getName() = "FloatingBubble"
 
     @ReactMethod
-    fun startFloating(apiKey: String, mode: String, backendUrl: String) {
+    fun startFloating(apiKey: String, mode: String, backendUrl: String, deviceId: String) {
         val ctx = reactApplicationContext
 
-        // Check overlay permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(ctx)) {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -31,6 +30,7 @@ class FloatingModule(reactContext: ReactApplicationContext) :
             putExtra(FloatingService.EXTRA_API_KEY, apiKey)
             putExtra(FloatingService.EXTRA_MODE, mode)
             putExtra(FloatingService.EXTRA_BACKEND_URL, backendUrl)
+            putExtra(FloatingService.EXTRA_DEVICE_ID, deviceId)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ctx.startForegroundService(intent)

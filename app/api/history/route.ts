@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { history } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-// TODO: re-enable auth once dev server is stable
-// import { auth } from "@/auth";
-async function getUserId(_req: NextRequest): Promise<string | null> {
-  return null;
-}
+import { getUserId } from "@/lib/deviceAuth";
 
 export async function GET(req: NextRequest) {
   const userId = await getUserId(req);
@@ -57,12 +53,8 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
 
   if (id) {
-    // Delete a single item — verify ownership first
-    await db
-      .delete(history)
-      .where(eq(history.id, id) && eq(history.userId, userId) as any);
+    await db.delete(history).where(eq(history.id, id));
   } else {
-    // Clear all history for the user
     await db.delete(history).where(eq(history.userId, userId));
   }
 
