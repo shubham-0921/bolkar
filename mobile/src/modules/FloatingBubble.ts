@@ -7,6 +7,7 @@ export interface FloatingBubbleConfig {
   mode: 'transcribe' | 'translate';
   backendUrl?: string;
   deviceId?: string;
+  authToken?: string;
 }
 
 function assertAndroid() {
@@ -20,7 +21,8 @@ export function startFloating(config: FloatingBubbleConfig): void {
     config.apiKey,
     config.mode,
     config.backendUrl ?? '',
-    config.deviceId ?? ''
+    config.deviceId ?? '',
+    config.authToken ?? ''
   );
 }
 

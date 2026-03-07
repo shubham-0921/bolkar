@@ -8,7 +8,10 @@ RUN npm ci
 
 COPY . .
 
-# Build the Next.js app
+# Build the Next.js app (NEXT_PUBLIC_* vars must be set at build time)
+ARG NEXT_PUBLIC_APP_URL=https://bolkar.online
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+
 RUN npm run build
 
 # Stage 2: Run

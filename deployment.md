@@ -43,8 +43,16 @@ docker run -d \
   --restart unless-stopped \
   -p 127.0.0.1:3000:3000 \
   -e SARVAM_API_KEY=your_sarvam_api_key \
+  -e DATABASE_URL="postgresql://postgres:your_password@your-db-host/bolkar" \
+  -e BETTER_AUTH_SECRET=your_better_auth_secret \
+  -e BETTER_AUTH_URL=https://your-domain.com \
+  -e NEXT_PUBLIC_APP_URL=https://your-domain.com \
+  -e GOOGLE_CLIENT_ID=your_google_client_id \
+  -e GOOGLE_CLIENT_SECRET=your_google_client_secret \
   bolkar
 ```
+
+> **Note:** `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` must be your actual public domain (with HTTPS). These are used for Google OAuth redirect URIs and session cookies.
 
 ---
 
@@ -184,6 +192,53 @@ sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
 
 ---
 
+## Step 5: Google OAuth setup for production
+
+Go to [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials → your OAuth 2.0 Client ID.
+
+Add the following:
+
+**Authorized JavaScript origins:**
+```
+https://bolkar.online
+https://www.bolkar.online
+```
+
+**Authorized redirect URIs:**
+```
+https://bolkar.online/api/auth/callback/google
+https://www.bolkar.online/api/auth/callback/google
+```
+
+Click **Save**. OAuth will start working immediately — no redeploy needed.
+
+> **Mobile OAuth:** The Android app also uses this same OAuth client. No additional Google Console config is needed for mobile — it goes through the web OAuth flow via `expo-web-browser` pointing at `https://bolkar.online`.
+
+---
+
+## Mobile development setup
+
+After adding new packages to `mobile/package.json`, you must run `npm install` inside the `mobile/` directory before building. The root `node_modules` is separate — forgetting this causes `expo run:android` to exit silently with no error.
+
+```bash
+cd mobile && npm install
+npm run android
+```
+
+---
+
+## Step 6: Update mobile app for production
+
+In `mobile/src/screens/HomeScreen.tsx`, change the default backend URL to the production domain:
+
+```ts
+const DEFAULT_BACKEND_URL = 'https://bolkar.online';
+```
+
+Rebuild and redeploy the Android APK after this change.
+
+---
+
 ## Updating the app
 
 ```bash
@@ -204,6 +259,12 @@ docker run -d \
   --restart unless-stopped \
   -p 127.0.0.1:3000:3000 \
   -e SARVAM_API_KEY=your_sarvam_api_key \
+  -e DATABASE_URL="postgresql://postgres:SinCos%401998@35.200.237.127/bolkar?sslmode=require" \
+  -e BETTER_AUTH_SECRET=your_better_auth_secret \
+  -e BETTER_AUTH_URL=https://bolkar.online \
+  -e NEXT_PUBLIC_APP_URL=https://bolkar.online \
+  -e GOOGLE_CLIENT_ID=your_google_client_id \
+  -e GOOGLE_CLIENT_SECRET=your_google_client_secret \
   bolkar
 ```
 

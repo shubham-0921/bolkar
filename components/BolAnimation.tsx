@@ -38,7 +38,7 @@ export default function BolAnimation() {
     >
       <span
         style={{
-          color: "#c4b5fd",
+          color: "#5b21b6",
           display: "inline-block",
           transition: "opacity 0.35s ease, transform 0.35s ease",
           opacity: visible ? 1 : 0,
@@ -48,7 +48,7 @@ export default function BolAnimation() {
         {words[index].text}
       </span>
       <span
-        className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-sm font-normal tracking-widest text-zinc-400 uppercase"
+        className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-sm font-normal tracking-widest text-slate-700 uppercase"
         style={{
           transition: "opacity 0.35s ease",
           opacity: visible ? 1 : 0,

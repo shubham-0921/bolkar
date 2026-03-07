@@ -35,13 +35,13 @@ export default function LanguageChips() {
               className="flex cursor-default items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm transition-all duration-200"
               style={{
                 backgroundColor: isHovered
-                  ? `color-mix(in srgb, ${color} 25%, transparent)`
-                  : `color-mix(in srgb, ${color} 16%, transparent)`,
-                border: `1px solid ${isHovered
-                  ? `color-mix(in srgb, ${color} 65%, transparent)`
-                  : `color-mix(in srgb, ${color} 40%, transparent)`}`,
-                boxShadow: isHovered ? `0 0 18px color-mix(in srgb, ${color} 25%, transparent)` : "none",
-                color: isHovered ? "#f1f5f9" : "#94a3b8",
+                  ? `color-mix(in srgb, ${color} 38%, transparent)`
+                  : `color-mix(in srgb, ${color} 28%, transparent)`,
+                border: `1.5px solid ${isHovered
+                  ? `color-mix(in srgb, ${color} 85%, transparent)`
+                  : `color-mix(in srgb, ${color} 65%, transparent)`}`,
+                boxShadow: isHovered ? `0 0 18px color-mix(in srgb, ${color} 35%, transparent)` : "none",
+                color: isHovered ? "#0f172a" : "#1e293b",
               }}
             >
               {/* Native script */}
@@ -49,7 +49,7 @@ export default function LanguageChips() {
                 className="font-semibold transition-all duration-200"
                 style={{
                   fontSize: 10,
-                  color: isHovered ? color : `color-mix(in srgb, ${color} 80%, transparent)`,
+                  color: isHovered ? color : `color-mix(in srgb, ${color} 100%, transparent)`,
                   letterSpacing: isMore ? "0.05em" : undefined,
                 }}
               >
@@ -60,7 +60,7 @@ export default function LanguageChips() {
               <span style={{ color: `color-mix(in srgb, ${color} 30%, transparent)`, fontSize: 9 }}>|</span>
 
               {/* English name */}
-              <span className="font-medium" style={{ fontSize: 13 }}>{lang}</span>
+              <span className="font-semibold" style={{ fontSize: 13 }}>{lang}</span>
             </div>
 
             {/* Tooltip */}

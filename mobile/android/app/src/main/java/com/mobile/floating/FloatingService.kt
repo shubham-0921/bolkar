@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.media.MediaRecorder
@@ -12,13 +13,19 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.view.*
+import android.view.animation.DecelerateInterpolator
+import android.animation.ValueAnimator
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.*
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.math.abs
+import kotlin.math.max
 
 class FloatingService : Service() {
 
@@ -29,8 +36,15 @@ class FloatingService : Service() {
         const val EXTRA_MODE = "mode"
         const val EXTRA_BACKEND_URL = "backend_url"
         const val EXTRA_DEVICE_ID = "device_id"
+        const val EXTRA_AUTH_TOKEN = "auth_token"
+        private const val PREFS_NAME = "bolkar_service"
         private const val BAR_COUNT = 5
+        private const val DISMISS_TARGET_SIZE_DP = 96
+        private const val DISMISS_TARGET_BOTTOM_MARGIN_DP = 28
     }
+
+    private lateinit var prefs: SharedPreferences
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private lateinit var windowManager: WindowManager
     private var rootView: View? = null
@@ -43,26 +57,47 @@ class FloatingService : Service() {
     private var mode = "translate"
     private var backendUrl = ""
     private var deviceId = ""
+    private var authToken = ""
 
     private var isRecording = false
     private var isProcessing = false
 
-    private lateinit var micButton: View
+    private var idlePulseAnimator: ValueAnimator? = null
+    private var bubbleView: View? = null
+    private var bubbleBackground: GradientDrawable? = null
+    private var dismissTargetView: View? = null
+    private var dismissTargetBackground: GradientDrawable? = null
     private lateinit var statusText: TextView
     private lateinit var resultCard: View
     private lateinit var resultText: TextView
     private lateinit var waveformContainer: LinearLayout
     private val waveformBars = mutableListOf<View>()
+    private var silenceStartMs = 0L
+    private val SILENCE_THRESHOLD_AMP = 800  // raw amplitude below this = silence
+    private val SILENCE_AUTO_STOP_MS = 2000L // 2s of silence → auto-stop
 
-    // Polls amplitude every 80ms and animates bars
+    // Polls amplitude every 80ms, animates bars, and auto-stops after 2s silence
     private val amplitudeRunnable = object : Runnable {
         override fun run() {
             if (!isRecording) return
-            val rawAmp = (mediaRecorder?.maxAmplitude ?: 0) / 6000f
+            val rawAmpInt = mediaRecorder?.maxAmplitude ?: 0
+            val rawAmp = rawAmpInt / 6000f
             val amp = Math.sqrt(rawAmp.toDouble().coerceIn(0.0, 1.0)).toFloat()
+
+            // Silence detection
+            if (rawAmpInt < SILENCE_THRESHOLD_AMP) {
+                if (silenceStartMs == 0L) silenceStartMs = System.currentTimeMillis()
+                else if (System.currentTimeMillis() - silenceStartMs >= SILENCE_AUTO_STOP_MS) {
+                    stopRecording()
+                    return
+                }
+            } else {
+                silenceStartMs = 0L
+            }
+
             waveformBars.forEachIndexed { i, bar ->
                 val phase = Math.sin((System.currentTimeMillis() / 200.0) + i * 0.8).toFloat()
-                val jitter = 0.6f + (phase + 1f) / 5f  // 0.6..1.0
+                val jitter = 0.6f + (phase + 1f) / 5f
                 val minH = 4.dp
                 val maxH = 52.dp
                 val targetH = if (amp > 0.02f)
@@ -80,6 +115,7 @@ class FloatingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         createNotificationChannel()
         startForeground(NOTIF_ID, buildNotification("Bolkar ready — tap the mic"))
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -87,19 +123,60 @@ class FloatingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        apiKey = intent?.getStringExtra(EXTRA_API_KEY) ?: ""
-        mode = intent?.getStringExtra(EXTRA_MODE) ?: "translate"
-        backendUrl = intent?.getStringExtra(EXTRA_BACKEND_URL) ?: ""
-        deviceId = intent?.getStringExtra(EXTRA_DEVICE_ID) ?: ""
-        return START_STICKY
+        // If restarted by OS (null intent / START_STICKY), restore config from SharedPreferences
+        if (intent != null) {
+            apiKey = intent.getStringExtra(EXTRA_API_KEY) ?: ""
+            mode = intent.getStringExtra(EXTRA_MODE) ?: "translate"
+            backendUrl = intent.getStringExtra(EXTRA_BACKEND_URL) ?: ""
+            deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: ""
+            authToken = intent.getStringExtra(EXTRA_AUTH_TOKEN) ?: ""
+            // Persist so we can restore after OS kill + restart
+            prefs.edit()
+                .putString(EXTRA_API_KEY, apiKey)
+                .putString(EXTRA_MODE, mode)
+                .putString(EXTRA_BACKEND_URL, backendUrl)
+                .putString(EXTRA_DEVICE_ID, deviceId)
+                .putString(EXTRA_AUTH_TOKEN, authToken)
+                .apply()
+        } else {
+            // OS restarted the service with null intent — restore from prefs
+            apiKey = prefs.getString(EXTRA_API_KEY, "") ?: ""
+            mode = prefs.getString(EXTRA_MODE, "translate") ?: "translate"
+            backendUrl = prefs.getString(EXTRA_BACKEND_URL, "") ?: ""
+            deviceId = prefs.getString(EXTRA_DEVICE_ID, "") ?: ""
+            authToken = prefs.getString(EXTRA_AUTH_TOKEN, "") ?: ""
+        }
+        // Apply mode color + label now that mode is known
+        if (!isRecording && !isProcessing) {
+            setBubbleColor(idleBubbleColor())
+            updateWaveformColor()
+            showIdleStatus()
+            startIdlePulse()
+        }
+        return START_REDELIVER_INTENT
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        idlePulseAnimator?.cancel()
         handler.removeCallbacks(amplitudeRunnable)
         scope.cancel()
+        releaseWakeLock()
         mediaRecorder?.release()
         rootView?.let { windowManager.removeView(it) }
+        dismissTargetView?.let { windowManager.removeView(it) }
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "bolkar:recording")
+        wakeLock?.acquire(5 * 60 * 1000L) // max 5 minutes
+    }
+
+    private fun releaseWakeLock() {
+        if (wakeLock?.isHeld == true) wakeLock?.release()
+        wakeLock = null
     }
 
     // ─── Overlay ────────────────────────────────────────────────────────────
@@ -110,11 +187,14 @@ class FloatingService : Service() {
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
+            clipChildren = false
+            clipToPadding = false
+            setPadding(8.dp, 8.dp, 8.dp, 0)
         }
 
         // Mic bubble — click handled in makeDraggable via ACTION_UP
         val bubble = buildBubble(ctx)
-        micButton = bubble
+        bubbleView = bubble
         container.addView(bubble, 72.dp, 72.dp)
 
         // Waveform bars (hidden until recording)
@@ -128,7 +208,7 @@ class FloatingService : Service() {
         repeat(BAR_COUNT) { i ->
             val bar = View(ctx).apply {
                 background = GradientDrawable().apply {
-                    setColor(Color.parseColor("#7c3aed"))
+                    setColor(Color.parseColor(idleBubbleColor()))
                     cornerRadius = 3.dp.toFloat()
                 }
             }
@@ -143,7 +223,8 @@ class FloatingService : Service() {
         // Status label
         val status = TextView(ctx).apply {
             textSize = 11f
-            setTextColor(Color.parseColor("#a1a1aa"))
+            setTextColor(Color.parseColor("#1e293b"))
+            setShadowLayer(3f, 0f, 1f, Color.parseColor("#ffffffcc"))
             gravity = Gravity.CENTER
             setPadding(0, 4.dp, 0, 0)
             text = ""
@@ -169,23 +250,82 @@ class FloatingService : Service() {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
-            x = 16.dp
-            y = 200.dp
+            gravity = Gravity.TOP or Gravity.START
+            x = (resources.displayMetrics.widthPixels - 72.dp - 16.dp).coerceAtLeast(16.dp)
+            y = ((resources.displayMetrics.heightPixels - 72.dp) / 2).coerceAtLeast(16.dp)
         }
 
         windowManager.addView(container, params)
+        createDismissTarget()
         makeDraggable(container, params)
+        // Show mode label and start pulse (mode may update in onStartCommand)
+        showIdleStatus()
+        startIdlePulse()
+    }
+
+    private fun createDismissTarget() {
+        val target = FrameLayout(this).apply {
+            visibility = View.GONE
+            alpha = 0f
+            clipChildren = false
+            clipToPadding = false
+        }
+
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.parseColor("#14141f"))
+            setStroke(2.dp, Color.parseColor("#3f3f46"))
+        }
+        dismissTargetBackground = bg
+        target.background = bg
+
+        val cross = TextView(this).apply {
+            text = "X"
+            textSize = 28f
+            setTextColor(Color.parseColor("#a1a1aa"))
+            gravity = Gravity.CENTER
+        }
+        target.addView(cross, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+
+        val params = WindowManager.LayoutParams(
+            DISMISS_TARGET_SIZE_DP.dp,
+            DISMISS_TARGET_SIZE_DP.dp,
+            overlayWindowType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            y = DISMISS_TARGET_BOTTOM_MARGIN_DP.dp
+        }
+
+        dismissTargetView = target
+        windowManager.addView(target, params)
     }
 
     private fun buildBubble(ctx: Context): View {
-        val view = View(ctx)
-        view.background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.parseColor("#7c3aed"))
-            setStroke(2.dp, Color.parseColor("#c4b5fd"))
+        val logoSize = 38.dp
+        val frame = FrameLayout(ctx).apply {
+            clipToPadding = false
+            clipChildren = false
         }
-        return view
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 18.dp.toFloat()
+            setColor(Color.parseColor("#111827"))
+            setStroke(2.dp, Color.parseColor("#d9a930"))
+        }
+        bubbleBackground = bg
+        frame.background = bg
+
+        val logo = BolkarLogoView(ctx)
+        frame.addView(
+            logo,
+            FrameLayout.LayoutParams(logoSize, logoSize, Gravity.CENTER)
+        )
+        return frame
     }
 
     private fun buildResultCard(ctx: Context): LinearLayout {
@@ -244,45 +384,189 @@ class FloatingService : Service() {
         return btn
     }
 
-    // Fixed drag: return true on ACTION_DOWN so MOVE events are delivered.
-    // Distinguish tap (small movement) from drag (large movement) in ACTION_UP.
     private fun makeDraggable(view: View, params: WindowManager.LayoutParams) {
-        var startX = 0
+        var startRawX = 0
         var startY = 0
         var initialX = 0
         var initialY = 0
         var isDragging = false
+        var touchSlop = 8.dp
 
         view.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    startX = event.rawX.toInt()
+                    startRawX = event.rawX.toInt()
                     startY = event.rawY.toInt()
                     initialX = params.x
                     initialY = params.y
                     isDragging = false
-                    true // must return true to receive subsequent MOVE/UP events
+                    true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = event.rawX.toInt() - startX
+                    val dx = event.rawX.toInt() - startRawX
                     val dy = event.rawY.toInt() - startY
-                    if (!isDragging && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                    if (!isDragging && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
                         isDragging = true
                     }
                     if (isDragging) {
-                        params.x = initialX - dx
-                        params.y = initialY + dy
+                        showDismissTarget()
+                        val targetX = initialX + dx
+                        val targetY = initialY + dy
+                        params.x = (params.x + ((targetX - params.x) * 0.42f)).toInt()
+                        params.y = (params.y + ((targetY - params.y) * 0.42f)).toInt()
+                        constrainToScreen(params, view)
+                        setDismissTargetActive(isBubbleOverDismissTarget(params, view))
                         windowManager.updateViewLayout(view, params)
                     }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!isDragging) handleMicTap()
+                    if (!isDragging) {
+                        view.performClick()
+                        handleMicTap()
+                    } else {
+                        val shouldClose = isBubbleOverDismissTarget(params, view)
+                        hideDismissTarget()
+                        if (shouldClose) {
+                            stopSelf()
+                            return@setOnTouchListener true
+                        }
+                        snapToEdge(params, view, animate = true)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    hideDismissTarget()
                     true
                 }
                 else -> false
             }
         }
+    }
+
+    private fun showDismissTarget() {
+        val target = dismissTargetView ?: return
+        if (target.visibility == View.VISIBLE) return
+        target.visibility = View.VISIBLE
+        target.animate().cancel()
+        target.animate().alpha(1f).setDuration(140).start()
+    }
+
+    private fun hideDismissTarget() {
+        val target = dismissTargetView ?: return
+        setDismissTargetActive(false)
+        target.animate().cancel()
+        target.animate().alpha(0f).setDuration(120).withEndAction {
+            target.visibility = View.GONE
+        }.start()
+    }
+
+    private fun setDismissTargetActive(active: Boolean) {
+        dismissTargetBackground?.apply {
+            if (active) {
+                setColor(Color.parseColor("#3b1f1f"))
+                setStroke(2.dp, Color.parseColor("#ef4444"))
+            } else {
+                setColor(Color.parseColor("#14141f"))
+                setStroke(2.dp, Color.parseColor("#3f3f46"))
+            }
+        }
+    }
+
+    private fun isBubbleOverDismissTarget(params: WindowManager.LayoutParams, view: View): Boolean {
+        val dm = resources.displayMetrics
+        val vw = max(view.width, 72.dp)
+        val vh = max(view.height, 72.dp)
+
+        val bubbleCenterX = params.x + (vw / 2f)
+        val bubbleCenterY = params.y + (vh / 2f)
+
+        val targetSize = max(dismissTargetView?.width ?: 0, DISMISS_TARGET_SIZE_DP.dp).toFloat()
+        val targetCenterX = dm.widthPixels / 2f
+        val targetCenterY = dm.heightPixels - DISMISS_TARGET_BOTTOM_MARGIN_DP.dp - (targetSize / 2f)
+
+        val dx = bubbleCenterX - targetCenterX
+        val dy = bubbleCenterY - targetCenterY
+        val threshold = (targetSize * 0.5f) + (vw * 0.28f)
+        return (dx * dx + dy * dy) <= threshold * threshold
+    }
+
+    private fun constrainToScreen(params: WindowManager.LayoutParams, view: View) {
+        val dm = resources.displayMetrics
+        val vw = max(view.width, 72.dp)
+        val vh = max(view.height, 72.dp)
+        val maxX = max(16.dp, dm.widthPixels - vw - 16.dp)
+        val maxY = max(16.dp, dm.heightPixels - vh - 16.dp)
+        params.x = params.x.coerceIn(16.dp, maxX)
+        params.y = params.y.coerceIn(16.dp, maxY)
+    }
+
+    private fun snapToEdge(params: WindowManager.LayoutParams, view: View, animate: Boolean) {
+        constrainToScreen(params, view)
+        val dm = resources.displayMetrics
+        val vw = max(view.width, 72.dp)
+        val centerX = params.x + vw / 2f
+        // Snap X to nearest edge; keep Y exactly where user released
+        val snapX = if (centerX < dm.widthPixels / 2f) 16.dp
+                    else max(16.dp, dm.widthPixels - vw - 16.dp)
+
+        if (!animate) {
+            params.x = snapX
+            windowManager.updateViewLayout(view, params)
+            return
+        }
+
+        val startX = params.x
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 260
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { anim ->
+                val t = anim.animatedFraction
+                params.x = (startX + (snapX - startX) * t).toInt()
+                windowManager.updateViewLayout(view, params)
+            }
+        }.start()
+    }
+
+    private fun idleBubbleColor(): String =
+        if (mode == "translate") "#e9d5ff" else "#bfdbfe"
+
+    private fun idleModeLabel(): String =
+        if (mode == "translate") "→ English" else "As Spoken"
+
+    private fun updateWaveformColor() {
+        val color = Color.parseColor(idleBubbleColor())
+        waveformBars.forEach { bar ->
+            (bar.background as? GradientDrawable)?.setColor(color)
+        }
+    }
+
+    private fun showIdleStatus() {
+        showStatus(idleModeLabel())
+        statusText.setTextColor(Color.parseColor("#1e293b"))
+    }
+
+    private fun startIdlePulse() {
+        idlePulseAnimator?.cancel()
+        val bv = bubbleView ?: return
+        idlePulseAnimator = ValueAnimator.ofFloat(1f, 1.06f, 1f).apply {
+            duration = 2200
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { anim ->
+                val s = anim.animatedValue as Float
+                bv.scaleX = s
+                bv.scaleY = s
+            }
+        }
+        idlePulseAnimator?.start()
+    }
+
+    private fun stopIdlePulse() {
+        idlePulseAnimator?.cancel()
+        idlePulseAnimator = null
+        bubbleView?.scaleX = 1f
+        bubbleView?.scaleY = 1f
     }
 
     // ─── Recording ──────────────────────────────────────────────────────────
@@ -296,20 +580,30 @@ class FloatingService : Service() {
         val file = File(cacheDir, "bolkar_recording.m4a")
         recordingFile = file
 
-        mediaRecorder = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-            MediaRecorder(this) else @Suppress("DEPRECATION") MediaRecorder()
-        ).apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioSamplingRate(16000)
-            setAudioEncodingBitRate(64000)
-            setOutputFile(file.absolutePath)
-            prepare()
-            start()
+        try {
+            mediaRecorder = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+                MediaRecorder(this) else @Suppress("DEPRECATION") MediaRecorder()
+            ).apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioSamplingRate(16000)
+                setAudioEncodingBitRate(64000)
+                setOutputFile(file.absolutePath)
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            mediaRecorder?.release()
+            mediaRecorder = null
+            showStatus("Mic unavailable")
+            return
         }
 
+        acquireWakeLock()
         isRecording = true
+        silenceStartMs = 0L
+        stopIdlePulse()
         setBubbleColor("#ef4444")
         waveformContainer.visibility = View.VISIBLE
         handler.post(amplitudeRunnable)
@@ -323,6 +617,7 @@ class FloatingService : Service() {
         mediaRecorder = null
         isRecording = false
         isProcessing = true
+        releaseWakeLock()
 
         handler.removeCallbacks(amplitudeRunnable)
         waveformContainer.visibility = View.GONE
@@ -341,7 +636,9 @@ class FloatingService : Service() {
                 } finally {
                     handler.post {
                         isProcessing = false
-                        setBubbleColor("#7c3aed")
+                        setBubbleColor(idleBubbleColor())
+                        showIdleStatus()
+                        startIdlePulse()
                         updateNotification("Bolkar ready — tap the mic")
                     }
                 }
@@ -361,7 +658,11 @@ class FloatingService : Service() {
 
     private fun sendToBackend(file: File): String {
         val endpoint = backendUrl.trimEnd('/') + "/api/transcribe"
-        val headers = if (deviceId.isNotBlank()) mapOf("x-device-id" to deviceId) else emptyMap()
+        val headers = when {
+            authToken.isNotBlank() -> mapOf("Authorization" to "Bearer $authToken")
+            deviceId.isNotBlank() -> mapOf("x-device-id" to deviceId)
+            else -> emptyMap()
+        }
         return multipartPost(endpoint, file, headers, extraFields = mapOf("mode" to mode))
     }
 
@@ -420,10 +721,14 @@ class FloatingService : Service() {
     // ─── UI Helpers ─────────────────────────────────────────────────────────
 
     private fun showResult(text: String) {
+        // Auto-copy to clipboard
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText("bolkar", text))
+
         resultText.text = text
         resultCard.visibility = View.VISIBLE
-        showStatus("")
-        updateNotification("Result ready — tap Copy")
+        showStatus("Copied!")
+        updateNotification("Copied to clipboard")
     }
 
     private fun hideResult() {
@@ -431,10 +736,16 @@ class FloatingService : Service() {
         showStatus("")
     }
 
-    private fun showStatus(text: String) { statusText.text = text }
+    private fun showStatus(text: String) {
+        statusText.text = text
+        // Neutral color for transient messages; showIdleStatus sets the mode color
+        if (text != idleModeLabel()) {
+            statusText.setTextColor(Color.parseColor("#1e293b"))
+        }
+    }
 
     private fun setBubbleColor(hex: String) {
-        (micButton.background as? GradientDrawable)?.setColor(Color.parseColor(hex))
+        bubbleBackground?.setColor(Color.parseColor(hex))
     }
 
     // ─── Notifications ───────────────────────────────────────────────────────
@@ -465,6 +776,66 @@ class FloatingService : Service() {
         nm.notify(NOTIF_ID, buildNotification(text))
     }
 
+    private fun overlayWindowType(): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+    }
+
     // ─── Extension helpers ──────────────────────────────────────────────────
     private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
+
+    private class BolkarLogoView(ctx: Context) : View(ctx) {
+        private val goldColor = Color.parseColor("#d9a930")
+
+        private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+        }
+        private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val w = width.toFloat().coerceAtLeast(1f)
+            val h = height.toFloat().coerceAtLeast(1f)
+            val cx = w / 2f
+            val cy = h / 2f
+            val size = minOf(w, h)
+
+            ringPaint.color = goldColor
+            ringPaint.strokeWidth = size * 0.08f
+            canvas.drawCircle(cx, cy, size * 0.45f, ringPaint)
+
+            fillPaint.color = goldColor
+            val barW = size * 0.07f
+            val gap = size * 0.05f
+            val baseX = cx - (2f * (barW + gap))
+            val heights = floatArrayOf(0.18f, 0.30f, 0.44f, 0.30f, 0.18f)
+            for (i in heights.indices) {
+                val bh = size * heights[i]
+                val left = baseX + i * (barW + gap)
+                val top = cy - bh / 2f
+                val rr = barW / 2f
+                canvas.drawRoundRect(left, top, left + barW, top + bh, rr, rr, fillPaint)
+            }
+
+            arcPaint.color = goldColor
+            arcPaint.strokeWidth = size * 0.08f
+            val innerRect = RectF(cx + size * 0.07f, cy - size * 0.20f, cx + size * 0.30f, cy + size * 0.20f)
+            canvas.drawArc(innerRect, -60f, 120f, false, arcPaint)
+
+            arcPaint.strokeWidth = size * 0.065f
+            val outerRect = RectF(cx + size * 0.14f, cy - size * 0.29f, cx + size * 0.46f, cy + size * 0.29f)
+            canvas.drawArc(outerRect, -62f, 124f, false, arcPaint)
+        }
+    }
 }

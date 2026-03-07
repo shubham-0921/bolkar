@@ -18,6 +18,7 @@ import { useHotWords } from "@/hooks/useHotWords";
 import { usePostProcess } from "@/hooks/usePostProcess";
 import HotWordsPanel from "@/components/HotWordsPanel";
 import BolkarLogo from "@/components/BolkarLogo";
+import AuthMenuButton from "@/components/AuthMenuButton";
 
 type Mode = "transcribe" | "translate";
 
@@ -55,29 +56,29 @@ function SpeedBadge({ ms }: { ms: number }) {
 const modeConfig = {
   translate: {
     label: "Speak Hinglish or any Indian language → polished English",
-    bg: "#1a0835",
+    bg: "#f8f5ff",
     glow: [
-      "radial-gradient(ellipse 160% 90% at 50% -5%, rgba(139,92,246,0.9) 0%, rgba(109,40,217,0.4) 40%, transparent 70%)",
-      "linear-gradient(to bottom, rgba(109,40,217,0.25) 0%, transparent 55%)",
+      "radial-gradient(ellipse 160% 90% at 50% -5%, rgba(139,92,246,0.22) 0%, rgba(109,40,217,0.1) 40%, transparent 75%)",
+      "linear-gradient(to bottom, rgba(109,40,217,0.08) 0%, transparent 55%)",
     ].join(", "),
-    micRingColor: "rgba(167,139,250,0.35)",
+    micRingColor: "rgba(124,58,237,0.22)",
     micIdle: "#7c3aed",
     activePillBg: "#7c3aed",
     activePillText: "#ffffff",
-    accent: "#c4b5fd",
+    accent: "#6d28d9",
   },
   transcribe: {
     label: "Speak any language → get text back in that same language",
-    bg: "#051a40",
+    bg: "#f3f8ff",
     glow: [
-      "radial-gradient(ellipse 160% 90% at 50% -5%, rgba(59,130,246,0.9) 0%, rgba(29,78,216,0.4) 40%, transparent 70%)",
-      "linear-gradient(to bottom, rgba(29,78,216,0.25) 0%, transparent 55%)",
+      "radial-gradient(ellipse 160% 90% at 50% -5%, rgba(59,130,246,0.22) 0%, rgba(29,78,216,0.1) 40%, transparent 75%)",
+      "linear-gradient(to bottom, rgba(29,78,216,0.08) 0%, transparent 55%)",
     ].join(", "),
-    micRingColor: "rgba(147,197,253,0.35)",
+    micRingColor: "rgba(37,99,235,0.22)",
     micIdle: "#2563eb",
     activePillBg: "#2563eb",
     activePillText: "#ffffff",
-    accent: "#93c5fd",
+    accent: "#1d4ed8",
   },
 };
 
@@ -195,7 +196,7 @@ export default function AppPage() {
       const pipWindow = await dPip.requestWindow({ width: 240, height: 320 });
       pipWindowRef.current = pipWindow;
       pipWindow.document.documentElement.style.cssText = "height:100%;margin:0;padding:0;";
-      pipWindow.document.body.style.cssText = "height:100%;margin:0;padding:0;overflow:hidden;background:#0c0c0f;";
+      pipWindow.document.body.style.cssText = "height:100%;margin:0;padding:0;overflow:hidden;background:#f8fafc;";
 
       const container = pipWindow.document.createElement("div");
       container.style.cssText = "height:100%;";
@@ -257,10 +258,10 @@ export default function AppPage() {
       <div className="pointer-events-none absolute inset-0" style={{ background: modeConfig.transcribe.glow, opacity: mode === "transcribe" ? 1 : 0, transition: "opacity 0.7s ease" }} />
 
       {/* Nav */}
-      <nav className="relative z-10 sticky top-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(20px)" }}>
+      <nav className="relative z-10 sticky top-0" style={{ borderBottom: "1px solid rgba(15,23,42,0.08)", backgroundColor: "rgba(255,255,255,0.82)", backdropFilter: "blur(20px)" }}>
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-white">
-            <BolkarLogo size={26} />
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
+            <BolkarLogo size={30} />
             <span>bol<span className="transition-colors duration-300" style={{ color: cfg.accent }}>kar</span></span>
           </Link>
           <div className="flex items-center gap-3">
@@ -270,9 +271,9 @@ export default function AppPage() {
               title="Hot words & post-processing"
               className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all"
               style={{
-                backgroundColor: (hotWords.length > 0 || ppOptions.removeFillerWords) ? "rgba(255,255,255,0.06)" : "transparent",
-                border: `1px solid ${(hotWords.length > 0 || ppOptions.removeFillerWords) ? "rgba(255,255,255,0.1)" : "transparent"}`,
-                color: "#a1a1aa",
+                backgroundColor: (hotWords.length > 0 || ppOptions.removeFillerWords) ? "rgba(15,23,42,0.06)" : "transparent",
+                border: `1px solid ${(hotWords.length > 0 || ppOptions.removeFillerWords) ? "rgba(15,23,42,0.12)" : "transparent"}`,
+                color: "#1e293b",
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -291,9 +292,9 @@ export default function AppPage() {
               title="View history"
               className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all"
               style={{
-                backgroundColor: historyItems.length > 0 ? "rgba(255,255,255,0.06)" : "transparent",
-                border: `1px solid ${historyItems.length > 0 ? "rgba(255,255,255,0.1)" : "transparent"}`,
-                color: historyItems.length > 0 ? "#a1a1aa" : "#71717a",
+                backgroundColor: historyItems.length > 0 ? "rgba(15,23,42,0.06)" : "transparent",
+                border: `1px solid ${historyItems.length > 0 ? "rgba(15,23,42,0.12)" : "transparent"}`,
+                color: historyItems.length > 0 ? "#1e293b" : "#334155",
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -307,21 +308,22 @@ export default function AppPage() {
                 </span>
               )}
             </button>
+            <AuthMenuButton callbackURL="/app" />
             <div
               className="hidden sm:flex items-center gap-2 rounded-full px-3.5 py-2"
-              style={{ backgroundColor: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.16)" }}
+              style={{ backgroundColor: "rgba(15,23,42,0.06)", border: "1px solid rgba(15,23,42,0.12)" }}
             >
-              <span className="text-xs font-semibold" style={{ color: "#a1a1aa" }}>Made with</span>
+              <span className="text-xs font-semibold" style={{ color: "#334155" }}>Made with</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://assets.sarvam.ai/assets/svgs/sarvam-logo-white.svg"
                 alt="Sarvam AI"
                 style={{
                   height: 17,
-                  filter: "drop-shadow(0 0 6px rgba(255,255,255,0.95)) drop-shadow(0 0 14px rgba(255,180,60,0.55))",
+                  filter: "brightness(0) opacity(0.65)",
                 }}
               />
-              <span className="text-xs font-semibold" style={{ color: "#ffffff" }}>Sarvam</span>
+              <span className="text-xs font-semibold" style={{ color: "#1e293b" }}>Sarvam</span>
             </div>
           </div>
         </div>
@@ -335,7 +337,7 @@ export default function AppPage() {
           <div className="mb-6 flex justify-center">
             <div
               className="flex rounded-2xl p-1.5 gap-1.5"
-              style={{ backgroundColor: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}
+              style={{ backgroundColor: "rgba(255,255,255,0.82)", border: "1px solid rgba(15,23,42,0.12)", backdropFilter: "blur(8px)" }}
             >
               <button
                 onClick={() => setAndSaveMode("translate")}
@@ -343,7 +345,7 @@ export default function AppPage() {
                 className="flex flex-col items-center gap-1 rounded-xl px-3 sm:px-8 py-4 transition-all duration-200 disabled:opacity-40"
                 style={{
                   backgroundColor: mode === "translate" ? cfg.activePillBg : "transparent",
-                  color: mode === "translate" ? "#ffffff" : "#a1a1aa",
+                  color: mode === "translate" ? "#ffffff" : "#1e293b",
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -364,7 +366,7 @@ export default function AppPage() {
                     }}
                   >{modeLabels.toEnglish}</span>
                 </div>
-                <span className="hidden sm:block text-xs font-medium opacity-70">Speak any language → English</span>
+                <span className="hidden sm:block text-xs font-medium" style={{ color: mode === "translate" ? "rgba(255,255,255,0.75)" : "#475569" }}>Speak any language → English</span>
               </button>
               <button
                 onClick={() => setAndSaveMode("transcribe")}
@@ -372,7 +374,7 @@ export default function AppPage() {
                 className="flex flex-col items-center gap-1 rounded-xl px-3 sm:px-8 py-4 transition-all duration-200 disabled:opacity-40"
                 style={{
                   backgroundColor: mode === "transcribe" ? cfg.activePillBg : "transparent",
-                  color: mode === "transcribe" ? "#ffffff" : "#a1a1aa",
+                  color: mode === "transcribe" ? "#ffffff" : "#1e293b",
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -394,7 +396,7 @@ export default function AppPage() {
                     }}
                   >{modeLabels.asSpoken}</span>
                 </div>
-                <span className="hidden sm:block text-xs font-medium opacity-70">Speak → text in same language</span>
+                <span className="hidden sm:block text-xs font-medium" style={{ color: mode === "transcribe" ? "rgba(255,255,255,0.75)" : "#475569" }}>Speak → text in same language</span>
               </button>
             </div>
           </div>
@@ -407,7 +409,7 @@ export default function AppPage() {
               <div
                 key={mode}
                 className="mb-10 animate-fade-in-up overflow-hidden rounded-2xl"
-                style={{ backgroundColor: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}
+                style={{ backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(15,23,42,0.12)", backdropFilter: "blur(8px)" }}
               >
                 <div
                   className="grid grid-cols-2"
@@ -417,20 +419,20 @@ export default function AppPage() {
                     transition: "opacity 0.45s ease, transform 0.45s ease",
                   }}
                 >
-                  <div className="p-4" style={{ borderRight: "1px solid rgba(255,255,255,0.1)", minHeight: "9rem" }}>
-                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#71717a" }}>You say</p>
-                    <p className="text-sm italic text-zinc-300 leading-relaxed">&ldquo;{ex.input}&rdquo;</p>
-                    <span className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "rgba(255,255,255,0.08)", color: "#a1a1aa" }}>{ex.lang}</span>
+                  <div className="p-4" style={{ borderRight: "1px solid rgba(15,23,42,0.1)", minHeight: "9rem" }}>
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#334155" }}>You say</p>
+                    <p className="text-sm italic text-slate-700 leading-relaxed">&ldquo;{ex.input}&rdquo;</p>
+                    <span className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "rgba(15,23,42,0.08)", color: "#1e293b" }}>{ex.lang}</span>
                   </div>
                   <div className="p-4" style={{ minHeight: "9rem" }}>
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: cfg.accent }}>Bolkar outputs</p>
-                    <p className="text-sm font-medium text-white leading-relaxed">&ldquo;{ex.output}&rdquo;</p>
+                    <p className="text-sm font-medium text-slate-900 leading-relaxed">&ldquo;{ex.output}&rdquo;</p>
                     <span className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: `${cfg.activePillBg}30`, color: cfg.accent, border: `1px solid ${cfg.activePillBg}50` }}>{ex.outputLang}</span>
                   </div>
                 </div>
                 <div className="flex justify-center gap-1.5 pb-3 pt-1">
                   {examples.map((_, i) => (
-                    <button key={i} onClick={() => { setExampleVisible(false); setTimeout(() => { setExampleIdx(i); setExampleVisible(true); }, 300); }} className="rounded-full transition-all duration-300" style={{ width: i === exampleIdx ? 16 : 6, height: 6, backgroundColor: i === exampleIdx ? cfg.accent : "rgba(255,255,255,0.2)" }} />
+                    <button key={i} onClick={() => { setExampleVisible(false); setTimeout(() => { setExampleIdx(i); setExampleVisible(true); }, 300); }} className="rounded-full transition-all duration-300" style={{ width: i === exampleIdx ? 16 : 6, height: 6, backgroundColor: i === exampleIdx ? cfg.accent : "rgba(15,23,42,0.2)" }} />
                   ))}
                 </div>
               </div>
@@ -439,16 +441,16 @@ export default function AppPage() {
 
           {/* ── Streaming transcript — main focus during processing ── */}
           {isProcessing && (
-            <div className="mb-8 animate-fade-in-up overflow-hidden rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="mb-8 animate-fade-in-up overflow-hidden rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(15,23,42,0.1)" }}>
+              <div className="flex items-center gap-3 px-6 py-4" style={{ borderBottom: "1px solid rgba(15,23,42,0.08)" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin shrink-0">
                   <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
-                <span className="text-sm font-medium text-zinc-400">Transcribing…</span>
+                <span className="text-sm font-medium text-slate-700">Transcribing…</span>
               </div>
               <div className="min-h-[5rem] p-6">
                 {partialTranscript ? (
-                  <p className="text-base leading-relaxed text-zinc-100">
+                  <p className="text-base leading-relaxed text-slate-900">
                     {partialTranscript}
                     <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-zinc-400 align-middle" />
                   </p>
@@ -465,17 +467,17 @@ export default function AppPage() {
 
           {/* ── Result card — primary content when done ── */}
           {showResult && result && (
-            <div className="mb-6 animate-fade-in-up overflow-hidden rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            <div className="mb-6 animate-fade-in-up overflow-hidden rounded-2xl" style={{ backgroundColor: "rgba(255,255,255,0.9)", border: "1px solid rgba(15,23,42,0.1)" }}>
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(15,23,42,0.08)" }}>
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="text-sm font-medium text-zinc-400">
+                  <span className="text-sm font-medium text-slate-700">
                     {result.mode === "translate" ? "Converted to English" : "Kept in your language"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <SpeedBadge ms={result.processingMs} />
-                  <span className="text-xs font-medium" style={{ color: "#a1a1aa" }}>Sarvam AI</span>
+                  <span className="text-xs font-medium" style={{ color: "#334155" }}>Sarvam AI</span>
                 </div>
               </div>
               <div className="p-6">
@@ -483,16 +485,16 @@ export default function AppPage() {
                   <textarea
                     value={editText}
                     onChange={(e) => setEditText(e.target.value)}
-                    className="w-full resize-none rounded-xl p-4 text-base leading-relaxed text-zinc-100 outline-none"
-                    style={{ backgroundColor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                    className="w-full resize-none rounded-xl p-4 text-base leading-relaxed text-slate-900 outline-none"
+                    style={{ backgroundColor: "rgba(15,23,42,0.04)", border: "1px solid rgba(15,23,42,0.12)" }}
                     rows={4}
                     autoFocus
                   />
                 ) : (
-                  <p className="text-base leading-relaxed text-zinc-100">{displayTranscript}</p>
+                  <p className="text-base leading-relaxed text-slate-900">{displayTranscript}</p>
                 )}
               </div>
-              <div className="flex items-center gap-3 px-6 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center gap-3 px-6 py-4" style={{ borderTop: "1px solid rgba(15,23,42,0.08)" }}>
                 <button onClick={handleCopy} className="flex flex-1 items-center justify-center gap-2 rounded-xl py-3 text-base font-semibold transition-all active:scale-95" style={{ backgroundColor: cfg.activePillBg, color: "#fff" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     {copied ? <polyline points="20 6 9 17 4 12" /> : <><rect width="14" height="14" x="8" y="8" rx="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></>}
@@ -500,14 +502,14 @@ export default function AppPage() {
                   {copied ? "Copied!" : "Copy"}
                 </button>
                 {editText === null ? (
-                  <button onClick={() => setEditText(displayTranscript)} className="flex items-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-200" style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <button onClick={() => setEditText(displayTranscript)} className="flex items-center gap-1.5 rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900" style={{ border: "1px solid rgba(15,23,42,0.12)" }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
                     Edit
                   </button>
                 ) : (
-                  <button onClick={handleCopy} className="rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/5" style={{ color: cfg.accent, border: "1px solid rgba(255,255,255,0.1)" }}>Copy edited</button>
+                  <button onClick={handleCopy} className="rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-slate-50" style={{ color: cfg.accent, border: "1px solid rgba(15,23,42,0.12)" }}>Copy edited</button>
                 )}
-                <button onClick={handleDismiss} className="rounded-xl px-4 py-3 text-sm text-zinc-500 transition-colors hover:text-zinc-300" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>Dismiss</button>
+                <button onClick={handleDismiss} className="rounded-xl px-4 py-3 text-sm text-slate-700 transition-colors hover:text-slate-900" style={{ border: "1px solid rgba(15,23,42,0.1)" }}>Dismiss</button>
               </div>
             </div>
           )}
@@ -570,7 +572,7 @@ export default function AppPage() {
               <button
                 onClick={handleMicClick}
                 className="flex items-center gap-2.5 rounded-full px-6 py-3 text-sm font-semibold transition-all active:scale-95"
-                style={{ backgroundColor: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "#a1a1aa" }}
+                style={{ backgroundColor: "rgba(15,23,42,0.06)", border: "1px solid rgba(15,23,42,0.12)", color: "#1e293b" }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
@@ -588,10 +590,10 @@ export default function AppPage() {
                 {isRecording && liveTranscript && (
                   <div
                     className="w-full rounded-2xl px-5 py-4 animate-fade-in-up"
-                    style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+                    style={{ backgroundColor: "rgba(255,255,255,0.9)", border: "1px solid rgba(15,23,42,0.1)" }}
                   >
-                    <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#71717a" }}>Live preview</p>
-                    <p className="text-sm leading-relaxed text-zinc-300">
+                    <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "#334155" }}>Live preview</p>
+                    <p className="text-sm leading-relaxed text-slate-700">
                       {liveTranscript}
                       <span className="ml-0.5 inline-block h-3.5 w-0.5 animate-pulse bg-zinc-500 align-middle" />
                     </p>
@@ -601,7 +603,7 @@ export default function AppPage() {
             )}
 
             {!showResult && !showError && (
-              <p className="text-base font-medium text-zinc-400">
+              <p className="text-base font-medium text-slate-700">
                 {isRecording ? "Recording — click to stop" : isProcessing ? "" : "Click the mic to start"}
               </p>
             )}
@@ -611,11 +613,11 @@ export default function AppPage() {
           {!isRecording && !isProcessing && !showResult && !showError && (pipSupported || notifSupported) && (
             <div
               className="mt-10 animate-fade-in-up overflow-hidden rounded-2xl"
-              style={{ backgroundColor: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.12)", backdropFilter: "blur(8px)" }}
+              style={{ backgroundColor: "rgba(255,255,255,0.88)", border: "1px solid rgba(15,23,42,0.12)", backdropFilter: "blur(8px)" }}
             >
               <div className="px-5 pt-5 pb-3">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#71717a" }}>Use Bolkar anywhere</p>
-                <p className="mt-1 text-sm" style={{ color: "#a1a1aa" }}>Keep Bolkar accessible while you work in other apps</p>
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#334155" }}>Use Bolkar anywhere</p>
+                <p className="mt-1 text-sm" style={{ color: "#1e293b" }}>Keep Bolkar accessible while you work in other apps</p>
               </div>
               <div className={`grid gap-3 px-5 pb-5 ${pipSupported && notifSupported ? "grid-cols-2" : "grid-cols-1"}`}>
                 {pipSupported && (
@@ -623,13 +625,13 @@ export default function AppPage() {
                     onClick={launchPip}
                     className="group flex flex-col items-start gap-3 rounded-xl p-4 text-left transition-all active:scale-95"
                     style={{
-                      backgroundColor: pipActive ? `${cfg.activePillBg}22` : "rgba(255,255,255,0.05)",
-                      border: `1px solid ${pipActive ? `${cfg.activePillBg}60` : "rgba(255,255,255,0.1)"}`,
+                      backgroundColor: pipActive ? `${cfg.activePillBg}22` : "rgba(15,23,42,0.05)",
+                      border: `1px solid ${pipActive ? `${cfg.activePillBg}60` : "rgba(15,23,42,0.12)"}`,
                     }}
                   >
                     <div
                       className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
-                      style={{ backgroundColor: pipActive ? cfg.activePillBg : "rgba(255,255,255,0.08)" }}
+                      style={{ backgroundColor: pipActive ? cfg.activePillBg : "rgba(15,23,42,0.08)" }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={pipActive ? "#fff" : cfg.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect width="18" height="14" x="3" y="3" rx="2" />
@@ -637,8 +639,8 @@ export default function AppPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white">Float it</p>
-                      <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "#a1a1aa" }}>
+                      <p className="text-sm font-semibold text-slate-900">Float it</p>
+                      <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "#1e293b" }}>
                         {pipActive ? "Re-open floating bubble" : "Stays on top while you use other apps"}
                       </p>
                     </div>
@@ -654,13 +656,13 @@ export default function AppPage() {
                     onClick={pinToNotifications}
                     className="group flex flex-col items-start gap-3 rounded-xl p-4 text-left transition-all active:scale-95"
                     style={{
-                      backgroundColor: pinned ? `${cfg.activePillBg}22` : "rgba(255,255,255,0.05)",
-                      border: `1px solid ${pinned ? `${cfg.activePillBg}60` : "rgba(255,255,255,0.1)"}`,
+                      backgroundColor: pinned ? `${cfg.activePillBg}22` : "rgba(15,23,42,0.05)",
+                      border: `1px solid ${pinned ? `${cfg.activePillBg}60` : "rgba(15,23,42,0.12)"}`,
                     }}
                   >
                     <div
                       className="flex h-10 w-10 items-center justify-center rounded-xl transition-colors"
-                      style={{ backgroundColor: pinned ? cfg.activePillBg : "rgba(255,255,255,0.08)" }}
+                      style={{ backgroundColor: pinned ? cfg.activePillBg : "rgba(15,23,42,0.08)" }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={pinned ? "#fff" : cfg.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
@@ -668,10 +670,10 @@ export default function AppPage() {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white">
+                      <p className="text-sm font-semibold text-slate-900">
                         {pinned ? "Unpin" : "Pin it"}
                       </p>
-                      <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "#a1a1aa" }}>
+                      <p className="mt-0.5 text-xs leading-relaxed" style={{ color: "#1e293b" }}>
                         {pinned ? "Pinned to notification bar — tap to remove" : "Quick access from your notification bar"}
                       </p>
                     </div>
@@ -693,12 +695,12 @@ export default function AppPage() {
       {copied && (
         <div
           className="animate-toast-slide fixed bottom-8 left-1/2 z-50 flex items-center gap-2 rounded-full px-5 py-3 shadow-2xl"
-          style={{ backgroundColor: "#1c1c22", border: "1px solid rgba(255,255,255,0.12)" }}
+          style={{ backgroundColor: "#ffffff", border: "1px solid rgba(15,23,42,0.12)" }}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span className="text-sm font-medium text-zinc-200">Copied to clipboard</span>
+          <span className="text-sm font-medium text-slate-800">Copied to clipboard</span>
         </div>
       )}
 
@@ -706,7 +708,7 @@ export default function AppPage() {
       {showTools && (
         <div
           className="fixed inset-0 z-40"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+          style={{ backgroundColor: "rgba(15,23,42,0.22)", backdropFilter: "blur(4px)" }}
           onClick={() => setShowTools(false)}
         />
       )}
@@ -715,15 +717,15 @@ export default function AppPage() {
       <div
         className="fixed left-0 top-0 z-50 flex h-full w-full flex-col sm:w-96"
         style={{
-          backgroundColor: "#0e0e12",
-          borderRight: "1px solid rgba(255,255,255,0.1)",
+          backgroundColor: "#ffffff",
+          borderRight: "1px solid rgba(15,23,42,0.1)",
           transform: showTools ? "translateX(0)" : "translateX(-100%)",
           transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
         }}
       >
-        <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <h2 className="text-base font-semibold text-white">Tools</h2>
-          <button onClick={() => setShowTools(false)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white">
+        <div className="flex items-center justify-between px-6 py-5" style={{ borderBottom: "1px solid rgba(15,23,42,0.08)" }}>
+          <h2 className="text-base font-semibold text-slate-900">Tools</h2>
+          <button onClick={() => setShowTools(false)} className="rounded-lg p-1.5 text-slate-700 hover:bg-slate-100 hover:text-slate-900">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
@@ -737,7 +739,7 @@ export default function AppPage() {
               className="flex-1 rounded-xl py-2 text-sm font-semibold transition-all"
               style={{
                 backgroundColor: toolsTab === tab ? cfg.activePillBg : "transparent",
-                color: toolsTab === tab ? "#fff" : "#71717a",
+                color: toolsTab === tab ? "#fff" : "#334155",
               }}
             >
               {tab === "hotwords" ? "Hot Words" : "Post-Process"}
@@ -748,14 +750,14 @@ export default function AppPage() {
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {toolsTab === "hotwords" ? (
             <div className="space-y-3">
-              <p className="text-xs leading-relaxed" style={{ color: "#71717a" }}>
+              <p className="text-xs leading-relaxed" style={{ color: "#334155" }}>
                 Spoken trigger phrases auto-replaced in every transcript. Say the trigger → get the replacement.
               </p>
               <HotWordsPanel hotWords={hotWords} onAdd={addHotWord} onRemove={removeHotWord} />
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-xs leading-relaxed" style={{ color: "#71717a" }}>
+              <p className="text-xs leading-relaxed" style={{ color: "#334155" }}>
                 Applied automatically to every transcript result.
               </p>
               {([
@@ -766,16 +768,16 @@ export default function AppPage() {
                 <div
                   key={key}
                   className="flex items-start justify-between gap-4 rounded-xl p-4"
-                  style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  style={{ backgroundColor: "rgba(15,23,42,0.04)", border: "1px solid rgba(15,23,42,0.08)" }}
                 >
                   <div>
-                    <p className="text-sm font-semibold text-white">{label}</p>
-                    <p className="mt-0.5 text-xs" style={{ color: "#71717a" }}>{desc}</p>
+                    <p className="text-sm font-semibold text-slate-900">{label}</p>
+                    <p className="mt-0.5 text-xs" style={{ color: "#334155" }}>{desc}</p>
                   </div>
                   <button
                     onClick={() => setPpOption(key, !ppOptions[key])}
                     className="mt-0.5 shrink-0 h-6 w-11 rounded-full transition-colors duration-200"
-                    style={{ backgroundColor: ppOptions[key] ? cfg.activePillBg : "rgba(255,255,255,0.1)" }}
+                    style={{ backgroundColor: ppOptions[key] ? cfg.activePillBg : "rgba(15,23,42,0.18)" }}
                     role="switch"
                     aria-checked={ppOptions[key]}
                   >
@@ -795,7 +797,7 @@ export default function AppPage() {
       {showHistory && (
         <div
           className="fixed inset-0 z-40"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+          style={{ backgroundColor: "rgba(15,23,42,0.22)", backdropFilter: "blur(4px)" }}
           onClick={() => setShowHistory(false)}
         />
       )}
@@ -804,8 +806,8 @@ export default function AppPage() {
       <div
         className="fixed right-0 top-0 z-50 flex h-full w-full flex-col sm:w-96"
         style={{
-          backgroundColor: "#0e0e12",
-          borderLeft: "1px solid rgba(255,255,255,0.1)",
+          backgroundColor: "#ffffff",
+          borderLeft: "1px solid rgba(15,23,42,0.1)",
           transform: showHistory ? "translateX(0)" : "translateX(100%)",
           transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
         }}
@@ -813,19 +815,19 @@ export default function AppPage() {
         {/* Panel header */}
         <div
           className="flex items-center justify-between px-6 py-5"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+          style={{ borderBottom: "1px solid rgba(15,23,42,0.08)" }}
         >
           <div>
-            <h2 className="text-base font-semibold text-white">History</h2>
-            <p className="text-xs text-zinc-400">Last {historyItems.length} of 10 saved locally</p>
+            <h2 className="text-base font-semibold text-slate-900">History</h2>
+            <p className="text-xs text-slate-700">Last {historyItems.length} of 10 saved locally</p>
           </div>
           <div className="flex items-center gap-3">
             {historyItems.length > 0 && (
-              <button onClick={clearHistory} className="text-xs text-zinc-500 transition-colors hover:text-red-400">
+              <button onClick={clearHistory} className="text-xs text-slate-700 transition-colors hover:text-red-500">
                 Clear all
               </button>
             )}
-            <button onClick={() => setShowHistory(false)} className="rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-white">
+            <button onClick={() => setShowHistory(false)} className="rounded-lg p-1.5 text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 6 6 18M6 6l12 12" />
               </svg>
@@ -841,7 +843,7 @@ export default function AppPage() {
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
                 <path d="M12 7v5l4 2" />
               </svg>
-              <p className="text-sm text-zinc-500">No recordings yet.<br />Your conversions will appear here.</p>
+              <p className="text-sm text-slate-700">No recordings yet.<br />Your conversions will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -849,19 +851,19 @@ export default function AppPage() {
                 <div
                   key={item.id}
                   className="group rounded-xl p-4 transition-colors"
-                  style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)" }}
+                  style={{ backgroundColor: "rgba(15,23,42,0.04)", border: "1px solid rgba(15,23,42,0.09)" }}
                 >
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span
                         className="rounded-full px-2 py-0.5 text-xs font-semibold"
                         style={item.mode === "translate"
-                          ? { backgroundColor: "rgba(124,58,237,0.2)", color: "#c4b5fd" }
-                          : { backgroundColor: "rgba(37,99,235,0.2)", color: "#93c5fd" }}
+                          ? { backgroundColor: "rgba(124,58,237,0.2)", color: "#5b21b6" }
+                          : { backgroundColor: "rgba(37,99,235,0.2)", color: "#1d4ed8" }}
                       >
                         {item.mode === "translate" ? "→ English" : "As spoken"}
                       </span>
-                      <span className="text-xs text-zinc-500">{timeAgo(item.timestamp)}</span>
+                      <span className="text-xs text-slate-700">{timeAgo(item.timestamp)}</span>
                       {item.processingMs && (
                         <div className="flex items-center gap-1 rounded-full px-1.5 py-0.5" style={{ backgroundColor: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.15)" }}>
                           <svg width="9" height="9" viewBox="0 0 24 24" fill="#fbbf24" stroke="none"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
@@ -875,7 +877,7 @@ export default function AppPage() {
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}
-                      className="rounded-lg p-1.5 text-zinc-500 opacity-0 transition-all group-hover:opacity-100 hover:bg-white/5 hover:text-zinc-200"
+                      className="rounded-lg p-1.5 text-slate-700 opacity-0 transition-all group-hover:opacity-100 hover:bg-slate-100 hover:text-slate-800"
                       title="Copy"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -883,7 +885,7 @@ export default function AppPage() {
                       </svg>
                     </button>
                   </div>
-                  <p className="line-clamp-3 text-sm leading-relaxed text-zinc-300">{item.transcript}</p>
+                  <p className="line-clamp-3 text-sm leading-relaxed text-slate-700">{item.transcript}</p>
                 </div>
               ))}
             </div>
@@ -892,8 +894,8 @@ export default function AppPage() {
 
         {/* Footer note */}
         <div
-          className="px-6 py-4 text-center text-xs text-zinc-500"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          className="px-6 py-4 text-center text-xs text-slate-700"
+          style={{ borderTop: "1px solid rgba(15,23,42,0.06)" }}
         >
           Stored locally in your browser · Never sent to a server
         </div>
