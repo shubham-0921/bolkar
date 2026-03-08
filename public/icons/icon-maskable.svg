@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 252 252" width="192" height="192">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a0835"/>
+      <stop offset="100%" stop-color="#08030f"/>
+    </linearGradient>
+    <linearGradient id="flame-outer" x1="96" y1="22" x2="96" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="55%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#7c2d12"/>
+    </linearGradient>
+    <linearGradient id="flame-inner" x1="96" y1="48" x2="96" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="60%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <linearGradient id="bowl" x1="48" y1="118" x2="144" y2="162" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="60%" r="45%">
+      <stop offset="0%" stop-color="rgba(251,146,60,0.35)"/>
+      <stop offset="100%" stop-color="rgba(251,146,60,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background fills full canvas including safe zone padding -->
+  <rect x="-30" y="-30" width="252" height="252" fill="url(#bg)"/>
+
+  <!-- Warm glow behind flame -->
+  <ellipse cx="96" cy="112" rx="52" ry="36" fill="url(#glow)"/>
+
+  <!-- Outer flame -->
+  <path d="M96 24
+    C88 38 72 55 70 76
+    C68 96 80 114 96 118
+    C112 114 124 96 122 76
+    C120 55 104 38 96 24Z"
+    fill="url(#flame-outer)"/>
+
+  <!-- Inner flame -->
+  <path d="M96 50
+    C91 60 84 72 84 84
+    C84 96 90 106 96 108
+    C102 106 108 96 108 84
+    C108 72 101 60 96 50Z"
+    fill="url(#flame-inner)" opacity="0.85"/>
+
+  <!-- Diya bowl body -->
+  <path d="M52 126
+    C52 120 62 116 74 118
+    C82 119 89 122 96 122
+    C103 122 110 119 118 118
+    C130 116 140 120 140 126
+    C140 140 128 152 117 154
+    C109 155 103 156 96 156
+    C89 156 83 155 75 154
+    C64 152 52 140 52 126Z"
+    fill="url(#bowl)"/>
+
+  <!-- Bowl highlight / sheen -->
+  <path d="M62 124
+    C67 120 76 119 84 120
+    C89 121 93 122 96 122
+    C99 122 103 121 108 120
+    C116 119 125 120 130 124
+    C125 130 116 134 108 135
+    C103 136 99 136 96 136
+    C93 136 89 136 84 135
+    C76 134 67 130 62 124Z"
+    fill="rgba(255,255,255,0.13)"/>
+
+  <!-- Wick connecting flame to bowl -->
+  <path d="M92 122 C92 118 94 116 96 116 C98 116 100 118 100 122"
+    stroke="rgba(253,230,138,0.7)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

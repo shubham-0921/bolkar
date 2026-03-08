@@ -19,6 +19,8 @@ import { usePostProcess } from "@/hooks/usePostProcess";
 import HotWordsPanel from "@/components/HotWordsPanel";
 import BolkarLogo from "@/components/BolkarLogo";
 import AuthMenuButton from "@/components/AuthMenuButton";
+import WorksWithStrip from "@/components/WorksWithStrip";
+import { signIn, useSession } from "@/lib/authClient";
 
 type Mode = "transcribe" | "translate";
 
@@ -93,7 +95,6 @@ export default function AppPage() {
   const [pinned, setPinned] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [exampleIdx, setExampleIdx] = useState(0);
-  const [exampleVisible, setExampleVisible] = useState(true);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pipRootRef = useRef<ReturnType<typeof ReactDOM.createRoot> | null>(null);
   const pipWindowRef = useRef<Window | null>(null);
@@ -104,6 +105,8 @@ export default function AppPage() {
   const { state, result, partialTranscript, liveTranscript, error, liveStream, formattedDuration, startRecording, stopRecording, reset } =
     useAudioRecorder();
   const { items: historyItems, addItem: addToHistory, clearHistory } = useHistory();
+  const { data: session } = useSession();
+  const isSignedIn = !!session?.user;
   const { hotWords, addHotWord, removeHotWord } = useHotWords();
   const { options: ppOptions, setOption: setPpOption, applyToTranscript } = usePostProcess();
 
@@ -127,20 +130,6 @@ export default function AppPage() {
   // Reset example index when mode changes
   useEffect(() => {
     setExampleIdx(0);
-    setExampleVisible(true);
-  }, [mode]);
-
-  // Cycle through examples: show for 4.5s, fade out 500ms, swap, fade in
-  useEffect(() => {
-    const examples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
-    const interval = setInterval(() => {
-      setExampleVisible(false);
-      setTimeout(() => {
-        setExampleIdx(i => (i + 1) % examples.length);
-        setExampleVisible(true);
-      }, 500);
-    }, 5000);
-    return () => clearInterval(interval);
   }, [mode]);
 
   useEffect(() => {
@@ -309,11 +298,13 @@ export default function AppPage() {
               )}
             </button>
             <AuthMenuButton callbackURL="/app" />
+            {/* Made with Sarvam — logo only on mobile, full badge on desktop */}
             <div
-              className="hidden sm:flex items-center gap-2 rounded-full px-3.5 py-2"
+              className="flex items-center gap-2 rounded-full px-2.5 sm:px-3.5 py-2"
               style={{ backgroundColor: "rgba(15,23,42,0.06)", border: "1px solid rgba(15,23,42,0.12)" }}
+              title="Made with Sarvam AI"
             >
-              <span className="text-xs font-semibold" style={{ color: "#334155" }}>Made with</span>
+              <span className="hidden sm:inline text-xs font-semibold" style={{ color: "#334155" }}>Made with</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="https://assets.sarvam.ai/assets/svgs/sarvam-logo-white.svg"
@@ -323,7 +314,7 @@ export default function AppPage() {
                   filter: "brightness(0) opacity(0.65)",
                 }}
               />
-              <span className="text-xs font-semibold" style={{ color: "#1e293b" }}>Sarvam</span>
+              <span className="hidden sm:inline text-xs font-semibold" style={{ color: "#1e293b" }}>Sarvam</span>
             </div>
           </div>
         </div>
@@ -411,14 +402,7 @@ export default function AppPage() {
                 className="mb-10 animate-fade-in-up overflow-hidden rounded-2xl"
                 style={{ backgroundColor: "rgba(255,255,255,0.84)", border: "1px solid rgba(15,23,42,0.12)", backdropFilter: "blur(8px)" }}
               >
-                <div
-                  className="grid grid-cols-2"
-                  style={{
-                    opacity: exampleVisible ? 1 : 0,
-                    transform: exampleVisible ? "translateY(0px)" : "translateY(6px)",
-                    transition: "opacity 0.45s ease, transform 0.45s ease",
-                  }}
-                >
+                <div className="grid grid-cols-2">
                   <div className="p-4" style={{ borderRight: "1px solid rgba(15,23,42,0.1)", minHeight: "9rem" }}>
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "#334155" }}>You say</p>
                     <p className="text-sm italic text-slate-700 leading-relaxed">&ldquo;{ex.input}&rdquo;</p>
@@ -432,7 +416,7 @@ export default function AppPage() {
                 </div>
                 <div className="flex justify-center gap-1.5 pb-3 pt-1">
                   {examples.map((_, i) => (
-                    <button key={i} onClick={() => { setExampleVisible(false); setTimeout(() => { setExampleIdx(i); setExampleVisible(true); }, 300); }} className="rounded-full transition-all duration-300" style={{ width: i === exampleIdx ? 16 : 6, height: 6, backgroundColor: i === exampleIdx ? cfg.accent : "rgba(15,23,42,0.2)" }} />
+                    <button key={i} onClick={() => setExampleIdx(i)} className="rounded-full transition-all duration-300" style={{ width: i === exampleIdx ? 16 : 6, height: 6, backgroundColor: i === exampleIdx ? cfg.accent : "rgba(15,23,42,0.2)" }} />
                   ))}
                 </div>
               </div>
@@ -691,6 +675,11 @@ export default function AppPage() {
         </div>
       </main>
 
+      {/* Works inside every app */}
+      <section style={{ borderTop: "1px solid rgba(15,23,42,0.08)", backgroundColor: "rgba(255,255,255,0.58)", paddingBottom: 32 }}>
+        <WorksWithStrip />
+      </section>
+
       {/* Toast */}
       {copied && (
         <div
@@ -819,7 +808,7 @@ export default function AppPage() {
         >
           <div>
             <h2 className="text-base font-semibold text-slate-900">History</h2>
-            <p className="text-xs text-slate-700">Last {historyItems.length} of 10 saved locally</p>
+            <p className="text-xs text-slate-500">{isSignedIn ? "Synced to your account" : `${historyItems.length} saved locally`}</p>
           </div>
           <div className="flex items-center gap-3">
             {historyItems.length > 0 && (
@@ -834,6 +823,27 @@ export default function AppPage() {
             </button>
           </div>
         </div>
+
+        {/* Sign-in prompt — shown when logged out */}
+        {!isSignedIn && (
+          <div
+            className="mx-4 mt-4 flex items-center gap-3 rounded-xl px-4 py-3"
+            style={{ backgroundColor: "rgba(109,40,217,0.07)", border: "1px solid rgba(109,40,217,0.18)" }}
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-slate-900">Save your history</p>
+              <p className="text-xs text-slate-500">Sign in to sync across devices</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => signIn.social({ provider: "google", callbackURL: "/app" })}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-500"
+              style={{ backgroundColor: "#7c3aed" }}
+            >
+              Sign in
+            </button>
+          </div>
+        )}
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-4 py-4">

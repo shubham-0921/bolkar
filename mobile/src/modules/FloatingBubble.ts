@@ -26,6 +26,11 @@ export function startFloating(config: FloatingBubbleConfig): void {
   );
 }
 
+export function setFloatingMode(mode: 'transcribe' | 'translate'): void {
+  assertAndroid();
+  NativeFloatingBubble.setMode(mode);
+}
+
 export function stopFloating(): void {
   assertAndroid();
   NativeFloatingBubble.stopFloating();
@@ -34,4 +39,14 @@ export function stopFloating(): void {
 export function isFloatingRunning(): Promise<boolean> {
   assertAndroid();
   return NativeFloatingBubble.isRunning();
+}
+
+export function isAccessibilityEnabled(): Promise<boolean> {
+  assertAndroid();
+  return NativeFloatingBubble.isAccessibilityEnabled();
+}
+
+export function openAccessibilitySettings(): void {
+  assertAndroid();
+  NativeFloatingBubble.openAccessibilitySettings();
 }

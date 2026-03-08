@@ -155,7 +155,7 @@ export function useAudioRecorder() {
 
       liveIntervalRef.current = setInterval(async () => {
         const snapshot = [...chunksRef.current];
-        if (snapshot.length < 4) return; // ~1s of audio minimum
+        if (snapshot.length < 2) return; // ~500ms of audio minimum
         const blob = new Blob(snapshot, { type: mimeTypeForLive });
         const fd = new FormData();
         fd.append("audio", blob, `live.${extForLive}`);
@@ -169,7 +169,7 @@ export function useAudioRecorder() {
         } catch {
           // silently ignore live transcription errors
         }
-      }, 4000);
+      }, 2000);
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
         setError("Microphone access denied. Please allow microphone access and try again.");

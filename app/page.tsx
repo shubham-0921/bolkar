@@ -4,6 +4,7 @@ import BolAnimation from "@/components/BolAnimation";
 import LanguageChips from "@/components/LanguageChips";
 import BolkarLogo from "@/components/BolkarLogo";
 import AuthMenuButton from "@/components/AuthMenuButton";
+import WorksWithStrip from "@/components/WorksWithStrip";
 
 export default function Home() {
   return (
@@ -188,6 +189,14 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Works inside every app */}
+      <section
+        className="relative z-10"
+        style={{ borderTop: "1px solid rgba(15,23,42,0.08)", backgroundColor: "rgba(255,255,255,0.58)", paddingTop: 40, paddingBottom: 40 }}
+      >
+        <WorksWithStrip />
+      </section>
+
       {/* Use Cases */}
       <section
         className="relative z-10"
@@ -246,13 +255,14 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm" style={{ color: "#334155" }}>Powered by</span>
+            <span className="text-sm" style={{ color: "#334155" }}>Made with</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="https://assets.sarvam.ai/assets/svgs/sarvam-logo-white.svg"
               alt="Sarvam AI"
-              style={{ height: 20, opacity: 0.82 }}
+              style={{ height: 18, filter: "brightness(0) opacity(0.65)" }}
             />
+            <span className="text-sm font-semibold" style={{ color: "#1e293b" }}>Sarvam</span>
           </div>
         </div>
       </footer>

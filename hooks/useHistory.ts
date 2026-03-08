@@ -31,10 +31,11 @@ export function useHistory() {
   useEffect(() => {
     if (userId) {
       fetch("/api/history")
-        .then((r) => (r.ok ? r.json() : []))
-        .then((rows: Array<{ id: string; transcript: string; mode: string; processingMs: number | null; createdAt: string }>) => {
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { items: Array<{ id: string; transcript: string; mode: string; processingMs: number | null; createdAt: string }> } | null) => {
+          if (!data?.items) return;
           setItems(
-            rows.map((r) => ({
+            data.items.map((r) => ({
               id: r.id,
               transcript: r.transcript,
               mode: r.mode as TranscriptionMode,

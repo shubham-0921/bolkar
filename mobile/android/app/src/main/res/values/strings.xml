@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Bolkar</string>
+    <string name="accessibility_service_description">Allows Bolkar to insert transcribed text directly into any text field across all apps.</string>
 </resources>

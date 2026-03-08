@@ -1,21 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { history } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, count, sql } from "drizzle-orm";
 import { getUserId } from "@/lib/deviceAuth";
 
 export async function GET(req: NextRequest) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const items = await db
-    .select()
-    .from(history)
-    .where(eq(history.userId, userId))
-    .orderBy(desc(history.createdAt))
-    .limit(50);
+  const [items, [{ total, totalWords }]] = await Promise.all([
+    db
+      .select()
+      .from(history)
+      .where(eq(history.userId, userId))
+      .orderBy(desc(history.createdAt))
+      .limit(200),
+    db
+      .select({
+        total: count(),
+        totalWords: sql<number>`coalesce(sum(array_length(regexp_split_to_array(trim(${history.transcript}), '\\s+'), 1)), 0)`,
+      })
+      .from(history)
+      .where(eq(history.userId, userId)),
+  ]);
 
-  return NextResponse.json(items);
+  return NextResponse.json({ items, total, totalWords });
 }
 
 export async function POST(req: NextRequest) {

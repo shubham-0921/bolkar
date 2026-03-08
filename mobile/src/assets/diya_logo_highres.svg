@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="58%">
+      <stop offset="0%" stop-color="#3b1177"/>
+      <stop offset="100%" stop-color="#20073f"/>
+    </radialGradient>
+
+    <linearGradient id="flameOuter" x1="512" y1="190" x2="512" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fff3ae"/>
+      <stop offset="45%" stop-color="#ffd24a"/>
+      <stop offset="100%" stop-color="#ff9800"/>
+    </linearGradient>
+
+    <linearGradient id="flameInner" x1="512" y1="270" x2="512" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fffde6"/>
+      <stop offset="100%" stop-color="#ffc14a"/>
+    </linearGradient>
+
+    <linearGradient id="diyaGold" x1="310" y1="565" x2="714" y2="700" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffe082"/>
+      <stop offset="45%" stop-color="#ffca28"/>
+      <stop offset="100%" stop-color="#ff9800"/>
+    </linearGradient>
+
+    <radialGradient id="glow" cx="50%" cy="56%" r="25%">
+      <stop offset="0%" stop-color="rgba(255,214,94,0.42)"/>
+      <stop offset="100%" stop-color="rgba(255,214,94,0)"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="512" cy="512" r="512" fill="url(#bg)"/>
+  <ellipse cx="512" cy="570" rx="230" ry="140" fill="url(#glow)"/>
+
+  <path d="M512 188
+           C480 250 408 326 402 420
+           C396 508 454 558 512 570
+           C570 558 628 508 622 420
+           C616 326 544 250 512 188Z"
+        fill="url(#flameOuter)"/>
+
+  <path d="M512 272
+           C494 312 468 358 468 410
+           C468 456 492 502 512 512
+           C532 502 556 456 556 410
+           C556 358 530 312 512 272Z"
+        fill="url(#flameInner)"/>
+
+  <path d="M316 602
+           C316 578 350 560 390 566
+           C432 572 468 586 512 586
+           C556 586 592 572 634 566
+           C674 560 708 578 708 602
+           C708 658 662 706 614 714
+           C580 720 548 724 512 724
+           C476 724 444 720 410 714
+           C362 706 316 658 316 602Z"
+        fill="url(#diyaGold)"/>
+
+  <path d="M356 596
+           C386 578 432 576 472 584
+           C488 588 500 590 512 590
+           C524 590 536 588 552 584
+           C592 576 638 578 668 596
+           C640 622 596 638 552 644
+           C536 646 524 648 512 648
+           C500 648 488 646 472 644
+           C428 638 384 622 356 596Z"
+        fill="rgba(255,255,255,0.22)"/>
+
+  <path d="M492 590 C492 576 500 568 512 568 C524 568 532 576 532 590"
+        fill="none"
+        stroke="#ffe9a4"
+        stroke-width="14"
+        stroke-linecap="round"/>
+</svg>

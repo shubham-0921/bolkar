@@ -12,12 +12,15 @@ import {
   Linking,
   ActivityIndicator,
   Animated,
+  Easing,
+  useWindowDimensions,
+  Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import { Audio } from 'expo-av';
 import { colors, radius } from '../theme';
-import { startFloating, stopFloating, isFloatingRunning } from '../modules/FloatingBubble';
+import { startFloating, stopFloating, isFloatingRunning, setFloatingMode, isAccessibilityEnabled, openAccessibilitySettings } from '../modules/FloatingBubble';
 import { timeAgo } from '../hooks/useHistory';
 import { getDeviceId } from '../utils/deviceId';
 import {
@@ -29,6 +32,97 @@ import {
   type AuthState,
 } from '../lib/authClient';
 import type { TranscriptionMode } from '@/core/types';
+
+// ─── Works With Strip ───────────────────────────────────────────────────────
+
+const WORKS_WITH_APPS = [
+  { name: 'WhatsApp',  logo: require('../assets/applogos/whatsapp.png')  },
+  { name: 'Instagram', logo: require('../assets/applogos/instagram.png') },
+  { name: 'Telegram',  logo: require('../assets/applogos/telegram.png')  },
+  { name: 'Gmail',     logo: require('../assets/applogos/gmail.png')     },
+  { name: 'Chrome',    logo: require('../assets/applogos/chrome.png')    },
+  { name: 'X',         logo: require('../assets/applogos/x.png')         },
+  { name: 'LinkedIn',  logo: require('../assets/applogos/linkedin.png')  },
+  { name: 'Slack',     logo: require('../assets/applogos/slack.png')     },
+  { name: 'Maps',      logo: require('../assets/applogos/maps.png')      },
+  { name: 'YouTube',   logo: require('../assets/applogos/youtube.png')   },
+];
+
+const ITEM_W = 80; // width per logo slot
+// Total width of one full set; animation moves exactly this far for a seamless loop
+const TOTAL_W = WORKS_WITH_APPS.length * ITEM_W; // 10 × 80 = 800px
+// Duration for one full loop: 800px / 80px/s = 10s → each logo takes ~1s to cross
+const STRIP_DURATION = 6000;
+
+function WorksWithStrip() {
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(translateX, {
+        toValue: -TOTAL_W,
+        duration: STRIP_DURATION,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [translateX]);
+
+  // Duplicate the list so the second copy fills the gap as the first scrolls off
+  const doubled = [...WORKS_WITH_APPS, ...WORKS_WITH_APPS];
+
+  return (
+    <View style={worksStyles.container}>
+      <Text style={worksStyles.heading}>Works inside every app</Text>
+      <View style={worksStyles.strip}>
+        <Animated.View style={[worksStyles.row, { transform: [{ translateX }] }]}>
+          {doubled.map((app, i) => (
+            <View key={i} style={worksStyles.itemWrap}>
+              <Image source={app.logo} style={worksStyles.iconImg} resizeMode="contain" />
+            </View>
+          ))}
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
+
+const worksStyles = StyleSheet.create({
+  container: {
+    marginTop: 28,
+    marginBottom: 8,
+  },
+  heading: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 14,
+    paddingHorizontal: 20,
+  },
+  strip: {
+    overflow: 'hidden',
+    height: 52,
+    marginHorizontal: -16, // bleed to screen edges for full-width feel
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  itemWrap: {
+    width: ITEM_W,
+    alignItems: 'center',
+  },
+  iconImg: {
+    width: 44,
+    height: 44,
+  },
+});
+
+// ────────────────────────────────────────────────────────────────────────────
 
 const BOL_WORDS = [
   { text: 'बोलो', lang: 'Hindi' },
@@ -128,39 +222,13 @@ interface DayGroup {
   items: Array<HistoryItem & { wordCount: number }>;
 }
 
-// ── Bolkar logo built from pure Views (ring + bars + arcs) ──────────────────
-const GOLD = '#d9a930';
 function BolkarLogoRN({ size = 28 }: { size?: number }) {
-  const s = size;
-  const bw = s * 0.075;
-  const barHeights = [0.16, 0.26, 0.38, 0.26, 0.16];
-  const barW = s * 0.055;
-  const barGap = s * 0.025;
-  const barsX = s * 0.23;
   return (
-    <View style={{ width: s, height: s }}>
-      {/* Outer ring */}
-      <View style={{ position: 'absolute', width: s, height: s, borderRadius: s / 2, borderWidth: bw, borderColor: GOLD }} />
-      {/* Waveform bars */}
-      {barHeights.map((h, i) => {
-        const bh = s * h;
-        return (
-          <View key={i} style={{
-            position: 'absolute', width: barW, height: bh,
-            backgroundColor: GOLD, borderRadius: barW / 2,
-            left: barsX + i * (barW + barGap), top: (s - bh) / 2,
-          }} />
-        );
-      })}
-      {/* Inner arc — right half of a clipped ellipse */}
-      <View style={{ position: 'absolute', left: s * 0.64, top: s * 0.42, width: s * 0.07, height: s * 0.16, overflow: 'hidden' }}>
-        <View style={{ position: 'absolute', left: -s * 0.07, width: s * 0.14, height: s * 0.16, borderRadius: s * 0.07, borderWidth: bw * 0.9, borderColor: GOLD }} />
-      </View>
-      {/* Outer arc */}
-      <View style={{ position: 'absolute', left: s * 0.69, top: s * 0.35, width: s * 0.105, height: s * 0.30, overflow: 'hidden' }}>
-        <View style={{ position: 'absolute', left: -s * 0.105, width: s * 0.21, height: s * 0.30, borderRadius: s * 0.105, borderWidth: bw * 0.8, borderColor: GOLD }} />
-      </View>
-    </View>
+    <Image
+      source={require('../assets/bolkar_logo.png')}
+      style={{ width: size, height: size }}
+      resizeMode="contain"
+    />
   );
 }
 
@@ -193,6 +261,8 @@ export default function HomeScreen() {
   const [isRunning, setIsRunning] = useState(false);
 
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyTotalWords, setHistoryTotalWords] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
 
@@ -203,6 +273,8 @@ export default function HomeScreen() {
 
   const [auth, setAuth] = useState<AuthState>(getAuthState());
   const [authLoading, setAuthLoading] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [showTimeSavedTip, setShowTimeSavedTip] = useState(false);
   const user = auth.user;
 
   const deviceIdRef = useRef<string>('');
@@ -214,10 +286,6 @@ export default function HomeScreen() {
   const [bolIndex, setBolIndex] = useState(0);
   const bolOpacity = useRef(new Animated.Value(1)).current;
   const bolTranslate = useRef(new Animated.Value(0)).current;
-
-  // Mode label cycling animation
-  const [modeLabelIndex, setModeLabelIndex] = useState(0);
-  const modeLabelOpacity = useRef(new Animated.Value(1)).current;
 
   const [sarvamLogoVisible, setSarvamLogoVisible] = useState(true);
 
@@ -270,8 +338,15 @@ export default function HomeScreen() {
       const res = await fetch(`${settings.backendUrl}/api/history`, { headers: apiHeaders() });
       if (res.ok) {
         const data = await res.json();
-        console.log('[history] response type:', typeof data, 'isArray:', Array.isArray(data), 'length:', Array.isArray(data) ? data.length : 'N/A', 'raw:', JSON.stringify(data).slice(0, 200));
-        setHistory(Array.isArray(data) ? data : []);
+        // Support both old array format and new { items, total } format
+        if (Array.isArray(data)) {
+          setHistory(data);
+          setHistoryTotal(data.length);
+        } else {
+          setHistory(Array.isArray(data.items) ? data.items : []);
+          setHistoryTotal(typeof data.total === 'number' ? data.total : 0);
+          setHistoryTotalWords(typeof data.totalWords === 'number' ? data.totalWords : 0);
+        }
       } else {
         const body = await res.text().catch(() => '');
         setHistoryError(`Server returned ${res.status}${body ? ': ' + body.slice(0, 120) : ''}`);
@@ -334,8 +409,32 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (activeTab === 'history') fetchHistory();
+    if (activeTab === 'hotwords' && hotWords.length === 0) fetchHotWords();
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch when auth changes (sign in / sign out) — user identity changed
+  useEffect(() => {
+    setHistory([]);
+    setHistoryTotal(0);
+    setHistoryTotalWords(0);
+    setHistoryError(null);
+    setHotWords([]);
+    if (activeTab === 'history') fetchHistory();
     if (activeTab === 'hotwords') fetchHotWords();
-  }, [activeTab, fetchHistory, fetchHotWords]);
+
+    // If the floating bubble is running, restart it with the updated auth token
+    // so new recordings are saved under the correct user, not the device ID.
+    if (isRunning && settings.mode && Platform.OS === 'android') {
+      stopFloating();
+      startFloating({
+        apiKey: '',
+        mode: settings.mode,
+        backendUrl: settings.backendUrl,
+        deviceId: deviceIdRef.current,
+        authToken: auth.token ?? '',
+      });
+    }
+  }, [auth.token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Language word cycling
   useEffect(() => {
@@ -350,17 +449,6 @@ export default function HomeScreen() {
     }, 2200);
     return () => clearInterval(id);
   }, [bolOpacity, bolTranslate]);
-
-  // Mode label cycling
-  useEffect(() => {
-    const id = setInterval(() => {
-      Animated.timing(modeLabelOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
-        setModeLabelIndex((i) => (i + 1) % MODE_LABELS.length);
-        Animated.timing(modeLabelOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-      });
-    }, 2500);
-    return () => clearInterval(id);
-  }, [modeLabelOpacity]);
 
   const switchUseCase = useCallback((i: number) => {
     useCaseIndexRef.current = i;
@@ -394,7 +482,10 @@ export default function HomeScreen() {
 
   const chooseMode = useCallback((mode: TranscriptionMode) => {
     saveSettings({ ...settings, mode });
-  }, [saveSettings, settings]);
+    if (isRunning && Platform.OS === 'android') {
+      setFloatingMode(mode);
+    }
+  }, [saveSettings, settings, isRunning]);
 
   const handleSaveSettings = async () => {
     const url = draftUrl.trim() || DEFAULT_BACKEND_URL;
@@ -426,6 +517,24 @@ export default function HomeScreen() {
       return;
     }
 
+    // Check accessibility service — needed for direct text insertion
+    const a11yEnabled = await isAccessibilityEnabled();
+    if (!a11yEnabled) {
+      Alert.alert(
+        'Enable text insertion',
+        'To insert transcribed text directly into any app, enable Bolkar in Accessibility Settings.\n\nYou can skip this — transcripts will still copy to clipboard.',
+        [
+          {
+            text: 'Open Settings',
+            onPress: () => {
+              openAccessibilitySettings();
+            },
+          },
+          { text: 'Skip for now', style: 'cancel' },
+        ]
+      );
+    }
+
     try {
       startFloating({
         apiKey: '',
@@ -450,9 +559,11 @@ export default function HomeScreen() {
     const map = new Map<string, DayGroup>();
 
     for (const item of history) {
+      const wordCount = countWords(item.transcript);
+      if (wordCount === 0) continue;
+
       const created = new Date(item.createdAt);
       const key = getDayKey(created);
-      const wordCount = countWords(item.transcript);
 
       if (!map.has(key)) {
         map.set(key, {
@@ -476,14 +587,17 @@ export default function HomeScreen() {
       }));
   }, [history]);
 
-  const totalWords = useMemo(
+  const localTotalWords = useMemo(
     () => history.reduce((sum, item) => sum + countWords(item.transcript), 0),
     [history]
   );
+  // Prefer server-computed total (covers all sessions); fall back to local count while loading
+  const totalWords = historyTotalWords > 0 ? historyTotalWords : localTotalWords;
 
-  const totalSessions = history.length;
-  // Time saved: typing at ~40 WPM vs speaking (near-instant). totalWords / 40 = minutes saved.
-  const timeSavedMins = Math.round(totalWords / 40);
+  const totalSessions = historyTotal;
+  // Time saved = time to type - time to speak
+  // Typing: ~40 WPM, Speaking: ~130 WPM → saved = words/40 - words/130 minutes
+  const timeSavedMins = Math.round(totalWords * (1 / 40 - 1 / 130));
   const timeSaved = timeSavedMins >= 60
     ? `${Math.floor(timeSavedMins / 60)}h ${timeSavedMins % 60}m`
     : `${timeSavedMins}m`;
@@ -525,16 +639,13 @@ export default function HomeScreen() {
           ) : user ? (
             <TouchableOpacity
               style={styles.accountChip}
-              onPress={() => {
-                setAuthLoading(true);
-                authSignOut(settings.backendUrl).finally(() => setAuthLoading(false));
-              }}
+              onPress={() => setAccountMenuOpen(true)}
             >
               <Text style={styles.accountChipText}>{user.name?.[0]?.toUpperCase() ?? '?'}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={[styles.signInBtn, { borderColor: cfg.primary }]}
+              style={styles.signInBtn}
               onPress={() => {
                 setAuthLoading(true);
                 googleSignIn(settings.backendUrl)
@@ -542,7 +653,7 @@ export default function HomeScreen() {
                   .finally(() => setAuthLoading(false));
               }}
             >
-              <Text style={[styles.signInText, { color: cfg.accent }]}>Sign in</Text>
+              <Text style={styles.signInText}>Sign in</Text>
             </TouchableOpacity>
           )}
 
@@ -593,6 +704,30 @@ export default function HomeScreen() {
         <Animated.View style={{ opacity: contentOpacity }}>
         {activeTab === 'home' && (
           <>
+            {/* Sign-in prompt (shown only when logged out) */}
+            {!user && (
+              <View style={styles.signInPromptCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.signInPromptTitle}>Save your history</Text>
+                  <Text style={styles.signInPromptSubtitle}>Sign in to sync across devices</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.signInPromptBtn}
+                  onPress={() => {
+                    setAuthLoading(true);
+                    googleSignIn(settings.backendUrl)
+                      .catch((e) => Alert.alert('Sign in failed', e?.message ?? 'Unknown error'))
+                      .finally(() => setAuthLoading(false));
+                  }}
+                >
+                  {authLoading
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Text style={styles.signInPromptBtnText}>Sign in</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Animated language tagline */}
             <View style={styles.taglineCard}>
               <Text style={styles.taglineDontType}>Don't type, just</Text>
@@ -617,9 +752,7 @@ export default function HomeScreen() {
                   ]}
                   onPress={() => chooseMode('translate')}
                 >
-                  <Animated.Text style={[styles.modeCardTitle, { opacity: modeLabelOpacity }]}>
-                    {MODE_LABELS[modeLabelIndex].toEnglish}
-                  </Animated.Text>
+                  <Text style={styles.modeCardTitle}>To English</Text>
                   <Text style={styles.modeCardHint}>Any Indian language → English</Text>
                 </TouchableOpacity>
 
@@ -630,9 +763,7 @@ export default function HomeScreen() {
                   ]}
                   onPress={() => chooseMode('transcribe')}
                 >
-                  <Animated.Text style={[styles.modeCardTitle, { opacity: modeLabelOpacity }]}>
-                    {MODE_LABELS[modeLabelIndex].asSpoken}
-                  </Animated.Text>
+                  <Text style={styles.modeCardTitle}>As Spoken</Text>
                   <Text style={styles.modeCardHint}>Keep original spoken language</Text>
                 </TouchableOpacity>
               </View>
@@ -733,6 +864,8 @@ export default function HomeScreen() {
                 </View>
               </Animated.View>
             </View>
+
+            <WorksWithStrip />
           </>
         )}
 
@@ -763,11 +896,20 @@ export default function HomeScreen() {
               </View>
             </View>
             <View style={styles.timeSavedCard}>
-              <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={styles.metricLabel}>⏱ Time Saved</Text>
-                <Text style={styles.timeSavedValue}>{timeSaved}</Text>
-                <Text style={styles.timeSavedHint}>vs typing at 40 WPM</Text>
+                <TouchableOpacity onPress={() => setShowTimeSavedTip(t => !t)}>
+                  <Text style={{ fontSize: 15, color: '#7c3aed' }}>ℹ</Text>
+                </TouchableOpacity>
               </View>
+              <Text style={styles.timeSavedValue}>{timeSaved}</Text>
+              {showTimeSavedTip ? (
+                <Text style={[styles.timeSavedHint, { marginTop: 6, lineHeight: 17 }]}>
+                  You speak ~130 words/min but type only ~40. Every word you dictated saved you the difference — so Bolkar saved you {timeSaved} of typing time.
+                </Text>
+              ) : (
+                <Text style={styles.timeSavedHint}>vs typing the same words</Text>
+              )}
             </View>
 
             {historyLoading ? (
@@ -864,6 +1006,42 @@ export default function HomeScreen() {
         )}
         </Animated.View>
       </ScrollView>
+
+      {/* Account dropdown modal */}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={accountMenuOpen}
+        onRequestClose={() => setAccountMenuOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.accountModalBackdrop}
+          activeOpacity={1}
+          onPress={() => setAccountMenuOpen(false)}
+        />
+        <View style={styles.accountDropdown}>
+          <View style={styles.accountDropdownHeader}>
+            <View style={styles.accountDropdownAvatar}>
+              <Text style={styles.accountDropdownAvatarText}>{user?.name?.[0]?.toUpperCase() ?? '?'}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              {user?.name ? <Text style={styles.accountDropdownName}>{user.name}</Text> : null}
+              <Text style={styles.accountDropdownEmail} numberOfLines={1}>{user?.email}</Text>
+            </View>
+          </View>
+          <View style={styles.accountDropdownDivider} />
+          <TouchableOpacity
+            style={styles.accountDropdownItem}
+            onPress={() => {
+              setAccountMenuOpen(false);
+              setAuthLoading(true);
+              authSignOut(settings.backendUrl).finally(() => setAuthLoading(false));
+            }}
+          >
+            <Text style={styles.accountDropdownSignOut}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -951,15 +1129,121 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   signInBtn: {
-    borderWidth: 1,
+    borderWidth: 2,
     borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    backgroundColor: '#ffffff',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    backgroundColor: '#7c3aed',
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
   },
   signInText: {
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  // Account dropdown modal
+  accountModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  accountDropdown: {
+    position: 'absolute',
+    top: 96,
+    right: 20,
+    width: 220,
+    backgroundColor: '#ffffff',
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    overflow: 'hidden',
+  },
+  accountDropdownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  accountDropdownAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#7c3aed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountDropdownAvatarText: {
+    color: '#fff',
     fontWeight: '700',
+    fontSize: 16,
+  },
+  accountDropdownName: {
+    color: '#0f172a',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  accountDropdownEmail: {
+    color: '#64748b',
+    fontSize: 12,
+  },
+  accountDropdownDivider: {
+    height: 1,
+    backgroundColor: '#f1f5f9',
+  },
+  accountDropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  accountDropdownSignOut: {
+    color: '#ef4444',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  // Sign-in prompt banner
+  signInPromptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#f5f3ff',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#ddd6fe',
+    gap: 12,
+  },
+  signInPromptTitle: {
+    color: '#4c1d95',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  signInPromptSubtitle: {
+    color: '#7c3aed',
+    fontSize: 12,
+    marginTop: 1,
+  },
+  signInPromptBtn: {
+    backgroundColor: '#7c3aed',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minWidth: 72,
+    alignItems: 'center',
+  },
+  signInPromptBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 13,
   },
   settingsBtn: {
     width: 34,

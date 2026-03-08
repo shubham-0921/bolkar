@@ -148,6 +148,7 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
   const [exampleIdx, setExampleIdx] = useState(0);
   const [exampleVisible, setExampleVisible] = useState(true);
   const [liveStream, setLiveStream] = useState<MediaStream | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState("");
 
   const activeExamples = mode === "translate" ? TRANSLATE_EXAMPLES : DICTATE_EXAMPLES;
   const modeLabels = useModeLabels(activeExamples[exampleIdx]?.labelIdx ?? 0);
@@ -156,11 +157,14 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startRef = useRef(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const speechRecRef = useRef<any>(null);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       mediaRef.current?.stream?.getTracks().forEach((t) => t.stop());
+      try { speechRecRef.current?.stop(); speechRecRef.current = null; } catch {}
     };
   }, []);
 
@@ -224,12 +228,33 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setLiveStream(stream);
+      setLiveTranscript("");
+      // Start live speech recognition (Web Speech API — Chrome/Android WebView)
+      const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognitionAPI) {
+        try {
+          const rec: any = new SpeechRecognitionAPI();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = "";
+          rec.onresult = (e: any) => {
+            let partial = "";
+            for (let i = e.resultIndex; i < e.results.length; i++) partial += e.results[i][0].transcript;
+            if (partial) setLiveTranscript(partial);
+          };
+          rec.onerror = () => {};
+          rec.start();
+          speechRecRef.current = rec;
+        } catch {}
+      }
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "";
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       mediaRef.current = recorder;
 
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = async () => {
+        try { speechRecRef.current?.stop(); speechRecRef.current = null; } catch {}
+        setLiveTranscript("");
         stream.getTracks().forEach((t) => t.stop());
         setLiveStream(null);
         if (timerRef.current) clearInterval(timerRef.current);
@@ -352,8 +377,25 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
             <PipWaveform
               stream={liveStream}
               isRecording={recState === "recording"}
-              accentColor={mode === "translate" ? "#a78bfa" : "#60a5fa"}
+              accentColor={mode === "translate" ? "#e9d5ff" : "#bfdbfe"}
             />
+          )}
+
+          {/* Live transcript — shown while recording when speech is detected */}
+          {recState === "recording" && liveTranscript && (
+            <div style={{
+              width: "100%",
+              backgroundColor: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 10,
+              padding: "6px 10px",
+              maxHeight: 56,
+              overflowY: "auto" as const,
+            }}>
+              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", margin: 0, lineHeight: 1.5, fontStyle: "italic" }}>
+                {liveTranscript}
+              </p>
+            </div>
           )}
 
           {/* Timer — shown while recording */}
@@ -374,7 +416,7 @@ export default function PipBubble({ initialMode }: { initialMode: Mode }) {
           {/* Example strip — idle only, revolving */}
           {recState === "idle" && (() => {
             const ex = activeExamples[exampleIdx];
-            const accentColor = mode === "translate" ? "#a78bfa" : "#60a5fa";
+            const accentColor = mode === "translate" ? "#e9d5ff" : "#bfdbfe";
             return (
               <div style={S.exampleStrip}>
                 <div style={{ opacity: exampleVisible ? 1 : 0, transform: exampleVisible ? "translateY(0px)" : "translateY(5px)", transition: "opacity 0.45s ease, transform 0.45s ease" }}>

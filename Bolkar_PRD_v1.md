@@ -163,6 +163,14 @@ The phasing strategy is driven by four principles: build for the broadest reach 
 - Voice shortcuts for frequently used phrases
 - Personal dictionary for names, brands and domain terms
 - Offline fallback for basic transcription without internet
+- **Language Selector (UI localisation):**
+  - Language picker at the top of the home screen — 7 languages: English, Hindi, Tamil, Telugu, Bengali, Kannada, Marathi
+  - Selecting a language switches all app UI text to that language instantly (zero latency, works offline)
+  - Translations are pre-generated once via Sarvam's translate API and hardcoded — same pattern as the existing `MODE_LABELS` cycling animation, expanded to cover all UI strings (~25 strings total)
+  - Locks the tagline animation word to the selected language instead of cycling
+  - Auto-sets the default transcription mode: non-English selection defaults to "To English" (Translate Mode); English selection defaults to "As Spoken" (Dictate Mode)
+  - Language preference persists in storage and is restored on next open
+  - Implementation note: do not use dynamic Sarvam API calls at runtime for UI translation — generate translations once at build time and ship them statically
 - **Personalisation (built on local history):**
   - Detect the user's dominant language from history and pre-select the right mode on open
   - Surface "your most used phrases" as one-tap shortcuts
@@ -174,6 +182,36 @@ The phasing strategy is driven by four principles: build for the broadest reach 
 **Auth, Data Collection and Rate Limiting (introduced in Phase 2):** Phase 2 introduces OAuth login (Google and phone number), enabling cross-device history sync, personalisation persistence, and a stable user identity for rate limiting. With auth in place, Bolkar can begin collecting real usage signal server-side for the first time: which mode users prefer, how often they re-record, which languages are most common, and where the Sarvam API struggles. This data informs Phase 3 pricing tiers and future model fine-tuning. A freemium tier with a monthly transcription cap and a paid tier with unlimited usage are introduced here, validated by the demand signals from Phase 1.
 
 **Why this order:** The notification tray approach has friction. A native app removes it entirely. This phase is justified once Phase 1 has validated that users find enough value to return daily.
+
+#### Phase 2.5: Long-Form Transcription (Batch API)
+
+**What it is:** Support for recordings longer than 30 seconds using Sarvam's async batch speech-to-text API, enabling use cases like meeting notes, lectures, and extended voice memos.
+
+**Background:** The current sync API (`POST /speech-to-text`) is capped at 30 seconds. Sarvam's batch API (released April 2025) supports up to 60 minutes per file and up to 20 files per job via an async job-based flow.
+
+**Batch API Flow:**
+1. `POST /speech-to-text/job/init` → receive `job_id` + Azure presigned upload URLs
+2. PUT audio file directly to Azure Data Lake (SAS URL)
+3. `POST /speech-to-text/job` → start the job with model parameters
+4. Poll `GET /speech-to-text/job/{job_id}/status` until `Completed`
+5. Download result JSON from Azure output storage path
+
+**Key Features:**
+- Auto-detect recording duration; use sync API under 30s, batch API over 30s
+- Progress indicator during async processing (polling every 5–10s)
+- Background processing with notification when result is ready (for very long recordings)
+- Webhook option for server-side callback instead of client polling
+
+**Key Constraints:**
+- Batch jobs can take 10–30s+ to process depending on audio length and load
+- UX must handle the async gap gracefully — user should not be left waiting on a blank screen
+- Azure SAS URL upload must be proxied through the Next.js backend to keep `SARVAM_API_KEY` server-side
+
+**Primary Segment:** Power users dictating long-form content — meeting summaries, voice notes, lecture transcriptions
+
+**Why this order:** Long-form is a strong retention driver but adds architectural complexity. It should be validated after the core short-form loop is sticky.
+
+---
 
 #### Phase 3: iOS and B2B Expansion
 
