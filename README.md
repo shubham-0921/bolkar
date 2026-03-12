@@ -6,17 +6,18 @@
 
 ## What is Bolkar?
 
-Bolkar is an India-first, zero-signup voice-to-text PWA. You speak — in Hindi, Hinglish, Tamil, Telugu, Bengali, Kannada, Marathi, or any of 22 Indian languages — and Bolkar instantly transcribes it and copies it to your clipboard.
+Bolkar is an India-first, zero-signup voice-to-text app. You speak — in Hindi, Hinglish, Tamil, Telugu, Bengali, Kannada, Marathi, or any of 22 Indian languages — and Bolkar instantly transcribes it and pastes it directly into whatever you're typing in.
 
-**The problem it solves:** Typing in Indian languages on a phone or desktop is slow, error-prone, and often requires switching keyboards. Bolkar removes all friction — speak naturally, get clean text in under 3 seconds, paste it anywhere.
+**The problem it solves:** Typing in Indian languages on a phone is slow, error-prone, and forces language-switching. Bolkar removes all friction — speak naturally, get clean text in under 3 seconds, pasted directly into any app.
 
 ### Key capabilities
 
 - **Two modes** — *To English*: translate any language to professional English. *As Spoken*: transcribe and keep text in the same language spoken.
 - **Automatic language detection** — no need to select a language; Sarvam detects it from the audio.
-- **Zero account required** — open the URL and start recording immediately.
-- **Works everywhere** — desktop floating bubble via Picture-in-Picture (always on top), Android persistent notification pin, installable as a PWA on Android and desktop.
-- **Local history** — last 10 conversions stored in the browser, never sent to a server.
+- **Zero account required** — open the URL or launch the app and start recording immediately.
+- **Works everywhere** — native Android floating bubble over any app with direct text injection, desktop floating bubble via Picture-in-Picture (always on top), installable as a PWA on Android and desktop.
+- **Direct text injection** — accessibility service pastes text directly into WhatsApp, Gmail, Instagram, Telegram, Chrome, and any other app without a manual paste step.
+- **History** — conversions stored server-side and synced across sessions.
 
 ---
 
@@ -24,10 +25,11 @@ Bolkar is an India-first, zero-signup voice-to-text PWA. You speak — in Hindi,
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router) |
+| Web Framework | Next.js 16 (App Router) |
+| Mobile Framework | Expo 55 + React Native 0.83 |
 | Language | TypeScript |
 | Styling | Tailwind CSS v4 (CSS-first `@theme` config) |
-| UI | React 19 |
+| UI | React 19 (web) / React Native (mobile) |
 | Speech AI | [Sarvam AI](https://sarvam.ai) — Saaras v3 model |
 | PWA | `manifest.json` + Service Worker |
 | Analytics | Google Analytics GA4 |
@@ -71,12 +73,43 @@ Released March 2026. Full details in the [Changelog](./CHANGELOG.md) and [PRD](.
 - Rotating example card — 6 examples per mode, auto-advances every 5 s
 - Mic button with 4 states: Idle → Recording (live waveform + timer) → Processing → Result
 - Result card: auto-copy to clipboard, speed badge, Edit, Dismiss, 10 s auto-dismiss
-- History panel — last 10 results, stored in `localStorage`, never leaves the device
+- History panel — conversions stored server-side and accessible across sessions
 - Float it — Picture-in-Picture bubble with full recording flow, always on top
 - Pin it — persistent Android notification for quick access
 
-### PRD coverage
-All Phase 1 requirements are shipped. See the [PRD Coverage Check](./CHANGELOG.md#prd-coverage-check) table.
+---
+
+## Phase 2 — Native Android App
+
+Built March 2026. Full details in the [Changelog](./CHANGELOG.md).
+
+### What's in the app
+
+- **Floating mic bubble** — system-wide overlay (`SYSTEM_ALERT_WINDOW` permission) that appears over WhatsApp, Gmail, Instagram, and any other app. Tap the Bolkar bubble, speak, and the text appears in the field you were typing in.
+- **Direct text injection** — `BolkarAccessibilityService` uses Android's accessibility API to inject transcribed text directly into the active input field (`ACTION_SET_TEXT`), with a clipboard-paste fallback for apps that don't expose accessibility nodes.
+- **Works With strip** — scrolling carousel showing 10 compatible apps: WhatsApp, Instagram, Telegram, Gmail, Chrome, X, LinkedIn, Slack, Maps, YouTube.
+- **Device ID auth** — zero-friction authentication using a stable device identifier; no login required.
+- **Full recording flow** — same two-mode system (To English / As Spoken) with automatic language detection, routed through the Next.js backend which holds the Sarvam API key.
+- **History** — persisted locally in `AsyncStorage`.
+- **Custom adaptive icon** — Bolkar diya icon at all mipmap densities (mdpi → xxxhdpi) with anydpi-v26 adaptive config.
+
+### Build
+
+```bash
+cd mobile/android
+./gradlew assembleRelease
+# Output: app/build/outputs/apk/release/app-release.apk
+
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+Or for development:
+
+```bash
+cd mobile && npm run android
+```
+
+The mobile app proxies all audio through the Next.js backend (`http://<your-lan-ip>:3000`) — the phone must be on the same Wi-Fi as the dev machine.
 
 ---
 
@@ -112,12 +145,16 @@ app/
   page.tsx              # Landing page
   app/page.tsx          # Recording app
   api/transcribe/       # API route → Sarvam AI
+  api/history/          # History API route
+  api/hot-words/        # Hot words API route
+  api/signout/          # Sign-out route
 components/
-  BolkarLogo.tsx        # Gold SVG logo mark
+  BolkarLogo.tsx        # Diya SVG logo mark
   LiveWaveform.tsx      # Canvas audio waveform
   PipBubble.tsx         # Picture-in-Picture recording UI
   LanguageChips.tsx     # Scrolling language carousel
   UseCaseAccordion.tsx  # Landing page use-case section
+  WorksWithStrip.tsx    # Scrolling app-logo compatibility strip
   BolAnimation.tsx      # Animated hero headline
 hooks/
   useAudioRecorder.ts   # MediaRecorder + state machine
@@ -127,8 +164,27 @@ lib/
   sarvam.ts             # Sarvam API client
   examples.ts           # Shared example data (12 examples across 2 modes)
 public/
-  manifest.json         # PWA manifest
+  manifest.json         # PWA manifest (separate any + maskable icons)
   sw.js                 # Service worker (notifications)
+  icons/
+    icon.svg            # PWA icon (any)
+    icon-maskable.svg   # PWA icon (maskable, safe-zone padded)
+mobile/
+  src/
+    screens/
+      HomeScreen.tsx    # Main app screen
+    modules/
+      FloatingBubble.ts # Native module bridge (startFloating, stopFloating, inject)
+    assets/             # App logos, diya icon
+  android/
+    app/src/main/java/com/bolkar/
+      MainActivity.kt
+      MainApplication.kt
+      floating/
+        FloatingService.kt           # SYSTEM_ALERT_WINDOW overlay service
+        FloatingModule.kt            # React Native bridge
+        FloatingPackage.kt           # RN package registration
+        BolkarAccessibilityService.kt # Text injection via accessibility API
 ```
 
 ---

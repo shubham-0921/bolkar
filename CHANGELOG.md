@@ -2,6 +2,88 @@
 
 ---
 
+## Phase 2 — Native Android App
+**Released:** March 2026
+**Stack:** Expo 55 · React Native 0.83 · TypeScript · Kotlin · Sarvam AI Saaras v3
+
+---
+
+### App Package: `com.bolkar`
+
+- Fully rebranded from initial `com.mobile` scaffolding
+- All Kotlin source files moved to `com.bolkar.*` package namespace
+
+---
+
+### Floating Mic Bubble (`FloatingService.kt`)
+
+- Uses `SYSTEM_ALERT_WINDOW` permission to render a persistent overlay over any app
+- Bubble stays visible while the user is in WhatsApp, Gmail, Instagram, Chrome, or any other app
+- Tap to start recording; tap again to stop
+- Mode (To English / As Spoken) synced from the main app via `FloatingModule`
+
+### React Native Bridge (`FloatingModule.kt` / `FloatingBubble.ts`)
+
+Exposes the following to the JS layer:
+
+| Method | Description |
+|---|---|
+| `startFloating()` | Starts the overlay service and shows the bubble |
+| `stopFloating()` | Stops the service and hides the bubble |
+| `isFloatingRunning()` | Returns current bubble state |
+| `setFloatingMode(mode)` | Syncs transcription mode (To English / As Spoken) to the service |
+| `isAccessibilityEnabled()` | Returns whether `BolkarAccessibilityService` is active |
+| `openAccessibilitySettings()` | Deep-links to Android Accessibility Settings |
+
+---
+
+### Direct Text Injection (`BolkarAccessibilityService.kt`)
+
+- Android accessibility service that tracks the last focused editable field across all apps
+- On transcription result, calls `insertText(text)`:
+  - **Attempt 1:** `ACTION_SET_TEXT` — directly sets field value, works in most native apps
+  - **Attempt 2:** Clipboard + `ACTION_PASTE` — fallback for apps that intercept ACTION_SET_TEXT
+  - **Attempt 3:** Clipboard pre-filled, returns `false` — UI shows paste prompt for apps like Notion with fully custom editors
+- Service config: `TYPE_VIEW_FOCUSED`, `TYPE_WINDOW_STATE_CHANGED`, `TYPE_VIEW_CLICKED` events; `FLAG_RETRIEVE_INTERACTIVE_WINDOWS`
+
+---
+
+### Home Screen (`HomeScreen.tsx`)
+
+- Mode toggle (To English / As Spoken) with language-cycling labels — same logic as the PWA
+- Mic button with 4 states: Idle → Recording → Processing → Result
+- Result displayed inline with Copy and Dismiss actions
+- Text injection status shown: "Typed directly" vs "Tap to paste"
+- **Works With strip** — animated scrolling carousel (6 s loop) of 10 app logos: WhatsApp, Instagram, Telegram, Gmail, Chrome, X, LinkedIn, Slack, Maps, YouTube
+- History panel backed by `AsyncStorage` — last 10 transcriptions, local only
+
+---
+
+### Auth
+
+- **Device ID auth** — stable hardware-derived identifier (`getDeviceId()`) used as the anonymous user identity; no login required for core functionality
+- **Google Sign-In** wired (`googleSignIn`, `authSignOut`, `onAuthChange`) but gated pending production backend
+
+---
+
+### App Icons
+
+- Replaced default `.webp` mipmap icons with Bolkar diya PNG at all densities: mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi
+- Added `mipmap-anydpi-v26/ic_launcher.xml` — adaptive icon with `@color/ic_launcher_background` (`#3b0764`) + `@drawable/ic_launcher_foreground` (diya logo)
+- Removed `android:tint` from foreground drawable — was forcing the logo to solid amber-yellow
+- PWA: split `"purpose": "any maskable"` into two separate manifest entries; `icon-maskable.svg` uses `viewBox="-30 -30 252 252"` to pad the content within the safe zone
+
+---
+
+### Android Build Config
+
+- `org.gradle.parallel=false` and `org.gradle.configureondemand=false` set in `gradle.properties` to fix Kotlin DSL metadata race condition with Gradle 8.13
+- `compileSdkVersion` and `targetSdkVersion` updated to 35
+- `FOREGROUND_SERVICE_MICROPHONE` permission added to `AndroidManifest.xml`
+- Accessibility service declared with `android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"`
+
+---
+
 ## Phase 1 — PWA: Desktop and Android
 **Released:** March 2026
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Sarvam AI Saaras v3

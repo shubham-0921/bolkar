@@ -154,34 +154,35 @@ The phasing strategy is driven by four principles: build for the broadest reach 
 
 #### Phase 2: Native Android App + Personalisation + Auth
 
-**What it is:** A full native Android app with the SYSTEM_ALERT_WINDOW permission, enabling a true floating bubble that appears over any other app on the device. This removes the copy-paste step entirely and makes Bolkar feel truly omnipresent. Phase 2 also introduces the first personalisation layer, turning the local history into a learning engine.
+**Status: Shipped — March 2026**
 
-**Key Features:**
-- True floating bubble over any app including native WhatsApp, Gmail and Instagram
-- Direct text injection into the active input field, no manual paste needed
+**What it is:** A full native Android app (Expo 55 + React Native 0.83) with the `SYSTEM_ALERT_WINDOW` permission, enabling a true floating bubble that appears over any other app on the device. A companion `BolkarAccessibilityService` injects transcribed text directly into the active input field — no copy-paste step required. This makes Bolkar feel truly omnipresent and embedded in the user's existing workflow.
+
+**What's Built:**
+
+- **Floating mic bubble** (`FloatingService.kt`) — system-wide overlay using `SYSTEM_ALERT_WINDOW`. The bubble appears over WhatsApp, Gmail, Instagram, Chrome, and any other app. Tap the bubble, speak, and the text appears in the field already focused.
+- **Direct text injection** (`BolkarAccessibilityService.kt`) — Android accessibility service that tracks the last focused editable field. On transcription completion, attempts `ACTION_SET_TEXT` to insert text directly; falls back to clipboard + paste for apps that use custom editors (Notion, etc.). Returns true/false so the UI can show a paste prompt when injection isn't possible.
+- **React Native bridge** (`FloatingModule.kt` / `FloatingBubble.ts`) — exposes `startFloating()`, `stopFloating()`, `setFloatingMode()`, `isFloatingRunning()`, `isAccessibilityEnabled()`, and `openAccessibilitySettings()` to the JS layer.
+- **Works With strip** — animated scrolling carousel of 10 compatible apps: WhatsApp, Instagram, Telegram, Gmail, Chrome, X, LinkedIn, Slack, Maps, YouTube.
+- **Full recording flow** — same two-mode system (To English / As Spoken) as the PWA. Audio is routed through the Next.js backend which holds the Sarvam API key securely; the APK contains no credentials.
+- **Device ID auth** — zero-friction stable identity using a hardware-derived device ID. No account or login required for core functionality.
+- **History** — last 10 transcriptions persisted locally in `AsyncStorage`.
+- **Custom branded icon** — Bolkar diya adaptive icon at all mipmap densities (mdpi → xxxhdpi), with `mipmap-anydpi-v26` adaptive XML for Android 8+ and correct maskable safe-zone padding for the PWA.
+- **Package: `com.bolkar`** — fully rebranded from the initial `com.mobile` scaffolding.
+
+**Pending (Phase 2 remainder):**
 - Custom Bolkar keyboard with built-in mic button
 - Voice shortcuts for frequently used phrases
-- Personal dictionary for names, brands and domain terms
+- Personal dictionary for names, brands, and domain terms
 - Offline fallback for basic transcription without internet
-- **Language Selector (UI localisation):**
-  - Language picker at the top of the home screen — 7 languages: English, Hindi, Tamil, Telugu, Bengali, Kannada, Marathi
-  - Selecting a language switches all app UI text to that language instantly (zero latency, works offline)
-  - Translations are pre-generated once via Sarvam's translate API and hardcoded — same pattern as the existing `MODE_LABELS` cycling animation, expanded to cover all UI strings (~25 strings total)
-  - Locks the tagline animation word to the selected language instead of cycling
-  - Auto-sets the default transcription mode: non-English selection defaults to "To English" (Translate Mode); English selection defaults to "As Spoken" (Dictate Mode)
-  - Language preference persists in storage and is restored on next open
-  - Implementation note: do not use dynamic Sarvam API calls at runtime for UI translation — generate translations once at build time and ship them statically
-- **Personalisation (built on local history):**
-  - Detect the user's dominant language from history and pre-select the right mode on open
-  - Surface "your most used phrases" as one-tap shortcuts
-  - Show usage streaks and word count saved to reinforce the habit loop
-  - Sync history across devices via optional account (opt-in, privacy-first)
+- Server-side history sync (Cloud SQL schema is in place; auth integration pending)
+- Freemium tier with monthly transcription cap
 
 **Primary Segment:** All Three Segments: Full Market
 
-**Auth, Data Collection and Rate Limiting (introduced in Phase 2):** Phase 2 introduces OAuth login (Google and phone number), enabling cross-device history sync, personalisation persistence, and a stable user identity for rate limiting. With auth in place, Bolkar can begin collecting real usage signal server-side for the first time: which mode users prefer, how often they re-record, which languages are most common, and where the Sarvam API struggles. This data informs Phase 3 pricing tiers and future model fine-tuning. A freemium tier with a monthly transcription cap and a paid tier with unlimited usage are introduced here, validated by the demand signals from Phase 1.
+**Auth, Data Collection and Rate Limiting:** Device ID auth ships in Phase 2 as the zero-friction identity layer. Full OAuth login (Google) is wired in the codebase but gated behind the server-side infrastructure being production-ready. With stable identity in place, Bolkar can begin collecting usage signal server-side: mode preference, language distribution, re-record rate, and Sarvam API error patterns. This data directly informs Phase 3 pricing tiers and future model fine-tuning. A freemium cap and paid tier will be introduced once the usage pattern baseline is established.
 
-**Why this order:** The notification tray approach has friction. A native app removes it entirely. This phase is justified once Phase 1 has validated that users find enough value to return daily.
+**Why this order:** The PWA notification tray approach validated demand in Phase 1. The native app removes the remaining friction — no browser, no tray, no paste — and delivers the experience the product was always designed for.
 
 #### Phase 2.5: Long-Form Transcription (Batch API)
 
@@ -329,13 +330,27 @@ Accessible via the "History" button in the top nav (shows a count badge when ite
 
 ### 7.8 Android UX Flow
 
+#### Phase 1 — PWA + Notification Tray
+
 | Step | Action | Description |
 |---|---|---|
-| 1 | Open Bolkar | User visits bolkar.app/app on Chrome for Android. Can install as a PWA to the home screen. |
+| 1 | Open Bolkar | User visits bolkar.online/app on Chrome for Android. Can install as a PWA to the home screen. |
 | 2 | Pin it (optional) | Tap "Pin it" to add a persistent notification to the Android notification bar for quick access. |
 | 3 | Trigger from anywhere | Pull down the notification bar and tap the Bolkar notification to open the app. |
 | 4 | Select mode and speak | Choose mode, tap mic, speak, tap to stop. |
 | 5 | Copy and paste | Text is auto-copied to clipboard. Return to any app and paste with a long-press. |
+
+#### Phase 2 — Native Android App (Floating Bubble + Text Injection)
+
+| Step | Action | Description |
+|---|---|---|
+| 1 | Install Bolkar APK | Install from APK or Play Store (future). App icon: Bolkar diya on dark purple. |
+| 2 | Grant permissions | On first launch: microphone (required), overlay / appear on top (for floating bubble), accessibility service (for direct text injection). |
+| 3 | Open any app | User is in WhatsApp, Gmail, Instagram — wherever they want to type. |
+| 4 | Tap the Bolkar bubble | The floating bubble is always visible as a small overlay. Tap to start recording. |
+| 5 | Speak | Live waveform confirms audio capture. Speak in any Indian language or Hinglish. |
+| 6 | Tap to stop | Sarvam transcribes the audio via the Bolkar backend. |
+| 7 | Text injected | `BolkarAccessibilityService` injects the result directly into the focused field — no paste needed. If injection fails (custom editor), clipboard is pre-filled and a paste prompt is shown. |
 
 ---
 
