@@ -1,6 +1,6 @@
 # Bolkar — Bol. Type mat kar.
 
-**[bolkar.online](https://bolkar.online)** &nbsp;·&nbsp; [Product Requirements Document](./Bolkar_PRD_v1.md) &nbsp;·&nbsp; [Changelog](./CHANGELOG.md)
+**[bolkar.online](https://bolkar.online)** &nbsp;·&nbsp; **[Android App](https://appdistribution.firebase.dev/i/3dde171a6f60bef3)** &nbsp;·&nbsp; [Product Requirements Document](./Bolkar_PRD_v1.md) &nbsp;·&nbsp; [Changelog](./CHANGELOG.md)
 
 ---
 
